@@ -43,12 +43,69 @@ attribmagic = 983040 #mesh attributes
 
 def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight, cull0x10):
     # Triangle Strip
+    def CompareTris(TrisA, TrisB, MatA, MatB):
+        #everything is counterclockwise cuz thats how da mf giogio do
+        if TrisA[-3] == TrisB[-3] and TrisA[-1] == TrisB[-2] and MatA == MatB: #strip right
+            return 1
+        elif TrisA[-2] == TrisB[-3] and TrisA[-1] == TrisB[-1] and MatA == MatB: #strip down 
+            return 2
+        elif TrisA[-3] == TrisB[-3] and TrisA[-1] == TrisB[-2] and MatA == MatB: #strip up
+            return 3
+        #elif TrisA[-3] == TrisB[-1] and TrisA[-2] == TrisB[-2] and MatA == MatB: #down left
+        #    return 4
+        else:
+            return 0
+
+    def BuldStrip(TrisA, TrisB, RemIndex, TriList, MatList, NewTris, NewMats, Order):
+        if Order == 1: #right
+            StrippedT = [ TrisA[-2], TrisA[-1], TrisA[-3], TrisB[-1] ]
+        if Order == 2: #down
+            StrippedT = [ TrisA[-3], TrisA[-2], TrisA[-1], TrisB[-2] ]   
+        if Order == 3: #down
+            StrippedT = [ TrisA[-2], TrisA[-1], TrisA[-3], TrisB[-1] ]   
+        #if Order == 4:
+        #    StrippedT = [ TrisA[-1], TrisA[-3], TrisA[-2], TrisB[-1] ]   
+        NewTris.append(StrippedT)
+        NewMats.append(MatList[RemIndex])
+        TriList.pop(RemIndex)
+        TriList.pop(RemIndex)
+        MatList.pop(RemIndex)
+        MatList.pop(RemIndex)
+
+    def TestTriangles(TriList, MatList, PassCount, NewTris, NewMats):
+        print("doin stuff....")
+        removecount = 0
+        for passindex in range(PassCount):
+            for index in range(len(TriList)-1):
+                sizecheck = len(TriList)-1-removecount
+                triscompared = CompareTris(TriList[index], TriList[index+1], MatList[index], MatList[index+1]) if index <= sizecheck else 0
+                if triscompared == 1:
+                    BuldStrip(TriList[index], TriList[index+1], index, TriList, MatList, NewTris, NewMats, 1)
+                    removecount = removecount+1
+                elif triscompared == 2:
+                    BuldStrip(TriList[index], TriList[index+1], index, TriList, MatList, NewTris, NewMats, 2)
+                    removecount = removecount+1
+                elif triscompared == 3:
+                    BuldStrip(TriList[index], TriList[index+1], index, TriList, MatList, NewTris, NewMats, 3)
+                    removecount = removecount+1
+                elif index <= sizecheck and triscompared == 0:
+                    TriList.insert(len(TriList), TriList[index+1])
+                    TriList.pop(index+1)
+        print(f"Adding remaining triangles ({len(TriList)})...")
+        for x in TriList:
+            NewTris.append(x)
+        print(f"Adding remaining materials ({len(MatList)})...")
+        for x in MatList:
+            NewMats.append(x)
+    
     def gettristrips(mesh, allmats):
         TMPstrip = []
         indices03 = []
         indices04 = []
-        strips03 = ""
-        strips04 = ""
+        stripmat03 = []
+        stripmat04 = []
+        strips03 = []
+        strips04 = []
         teststrip = []
         facemat03 = []
         facemat04 = []
@@ -75,46 +132,80 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
         for face in mesh.polygons:
             vc=len(face.vertices)
             for x in face.vertices:
-                TMPstrip.append(f"{intb(x)}")
+                #TMPstrip.append(f"{intb(x)}")
                 teststrip.append(x)
             if any(item in twoinflist for item in teststrip):
-                indices04.append(f"{vc}{face.vertices[0:]}")
+                fuckyouarray = [*face.vertices[0:]]
+                if len(fuckyouarray) == 4:         
+                    quadout = fuckyouarray[:-2]
+                    quadout = quadout + fuckyouarray[3:1:-1]
+                    indices04.append(quadout)
+                else:
+                    indices04.append(fuckyouarray)
                 facemat04.append(f"{mesh.materials[face.material_index].name}")
-                strips04 += (f" {intb(vc)} ")
-                for x in TMPstrip:
-                    strips04 += (f"{x} ") 
+                #strips04 += (f" {intb(vc)} ")
+                #for x in TMPstrip:
+                #    strips04 += (f"{x} ") 
             else:
-                indices03.append(f"{vc}{face.vertices[0:]}")
+                fuckyouarray = [*face.vertices[0:]]
+                if len(fuckyouarray) == 4:         
+                    quadout = fuckyouarray[:-2]
+                    quadout = quadout + fuckyouarray[3:1:-1]
+                    indices03.append(quadout)
+                else:
+                    indices03.append(fuckyouarray)
                 facemat03.append(f"{mesh.materials[face.material_index].name}")
-                strips03 += (f"{intb(vc)}")
-                for x in TMPstrip:
-                    strips03 += (f"{x} ") 
+                #strips03 += (f"{intb(vc)}")
+                #for x in TMPstrip:
+                #    strips03 += (f"{x} ") 
             TMPstrip.clear()
             teststrip.clear()
 
-        print(f"(EXPERIMENTAL) Strips (Type 04): {indices04}")
-        print(f"(EXPERIMENTAL) Strips (Type 03): {indices03}")
-        tris04count = len(indices04)
-        tris03count = len(indices03)
-
-        tris04array = (f"{intb(trismagic04)} {intb(tris04count)} {getsizebytes(strips04)} {strips04}")
-        tris03array = (f"{intb(trismagic03)} {intb(tris03count)} {getsizebytes(strips03)} {strips03}")
-        facemat = ""
-        mattexlist = []
-        for x in range(texcount):
-            mattexlist.append(x)
-        matindex03 = ""
-        matindex04 = ""
+        #print(f"(EXPERIMENTAL) Strips (Type 04): {indices04}")
+        #print(f"(EXPERIMENTAL) Strips (Type 03): {indices03}")
+        
+        matindex03 = []
+        matindex04 = []
         for x in facemat04:
             for m in matlist:
                 if x == m:
-                    matindex04 += (f"{intb(matlist.index(m))} ")
+                    matindex04.append(matlist.index(m))
         for x in facemat03:
             for m in matlist:
                 if x == m:
-                    matindex03 += (f"{intb(matlist.index(m))} ")
-        facemat = (f"{matindex04} {matindex03}")
-        matperstrip = f"{intb(393216)} {intb(tris04count + tris03count)} {getsizebytes(facemat)} {facemat}"
+                    matindex03.append(matlist.index(m))
+                    
+        TestTriangles(indices03, matindex03, 3000, strips03, stripmat03)
+        TestTriangles(indices04, matindex04, 3000, strips04, stripmat04)
+
+        tris04count = len(indices04)
+        tris03count = len(indices03)
+
+        tmpout = ""
+        for x in strips03:
+            tmpout += (f"{intb(len(x))} {batchint(x)} ")
+        tris03array = (f"{intb(trismagic03)} {intb(len(strips03))} {getsizebytes(tmpout)} {tmpout}")
+
+        tmpout = ""
+        for x in strips04:
+            tmpout += (f"{intb(len(x))} {batchint(x)} ")
+        tris04array = (f"{intb(trismagic04)} {intb(len(strips04))} {getsizebytes(tmpout)} {tmpout}")
+
+        tmpout1 = ""
+        for x in stripmat03:
+            tmpout1 += (f"{intb(x)} ")
+
+        tmpout2 = ""
+        for x in stripmat04:
+            tmpout2 += (f"{intb(x)} ")
+
+        facemat = f"{tmpout2} {tmpout1}"
+        matperstrip = f"{intb(393216)} {intb((len(stripmat03) + len(stripmat04)))} {getsizebytes(facemat)} {facemat}"
+
+        mattexlist = []
+        for x in range(texcount):
+            mattexlist.append(x)
+
         matFinal= f"{intb(327680)} {intb(texcount)} {getsizebytes(batchint(mattexlist))} {batchint(mattexlist)} {matperstrip}"
 
         if len(strips04) > 0:
