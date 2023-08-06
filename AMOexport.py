@@ -15,31 +15,31 @@ bl_info = {
     "name": "Artistoon Model Exporter",
     "description": "Exporter for the Artistoon Model Format (AMO) found in GioGio's Bizarre Adventure.",
     "author": "Penguino",
-    "version": (1, 0),
-    "blender": (3, 4, 1),
+    "version": (1, 1),
+    "blender": (3, 6, 1),
     "location": "File > Export",
     "warning": "", # used for warning icon and text in addons panel
     "category": "Export",
 }
 
-#amodelmagic = 1      #AMO filehead
-unknwnmagic = 131072 #unknown (ram position?)
-#mdcontmagic = 2      #model container
-#mscontmagic = 4      #mesh container
-#tscontmagic = 5      #tri strip container
-trismagic03 = 196608 #tri strips with 1 or no bone influence
-trismagic04 = 262144 #tri strips with 2 bone influence
-mtlistmagic = 327680 #material list
-mtlprsmagic = 393216 #material per strip
-vertexmagic = 458752 #vertex coordinates
-normalmagic = 524288 #vertex normals
-vertUVmagic = 655360 #vertex UVs
-vcolormagic = 720896 #vertex colors
-weightmagic = 786432 #vertex weights
-gboundmagic = 1114112 #bounding model fetch
-attribmagic = 983040 #mesh attributes
-    #mtlsetmagic = 9      #material header?
-    #txheadmagic = 10     #texture header
+#AMO_magic = 1           #AMO filehead
+AMO_unknown = 131072     #unknown (ram position?)
+#AMO_model_container     = 2
+#AMO_mesh_container      = 4
+#AMO_tristrip_container  = 5
+AMO_tristrip_03_data     = 196608
+AMO_tristrip_04_data     = 262144 #tri strips with 2 bone influence
+AMO_material_list        = 327680
+AMO_material_per_strip   = 393216
+AMO_vertex_coordinates   = 458752
+AMO_vertex_normals       = 524288 
+AMO_vertex_UVs           = 655360 
+AMO_vertex_colors        = 720896
+AMO_vertex_groups        = 786432
+AMO_hitbox_identifier    = 1114112 #bounding model fetch
+AMO_mesh_attributes      = 983040
+#AMO_material_properties = 9
+#AMO_texture_properties  = 10
 
 def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight, cull0x10):
     # Triangle Strip
@@ -118,7 +118,6 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
         texcount = len(matlist)
         
         for vertex in mesh.vertices:
-            #print("Vertex: ", vertex.index)
             for group in vertex.groups:
                 vgroup_name = obj.vertex_groups[group.group].name
                 vgroup_weight = group.weight
@@ -132,7 +131,6 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
         for face in mesh.polygons:
             vc=len(face.vertices)
             for x in face.vertices:
-                #TMPstrip.append(f"{intb(x)}")
                 teststrip.append(x)
             if any(item in twoinflist for item in teststrip):
                 fuckyouarray = [*face.vertices[0:]]
@@ -143,9 +141,7 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
                 else:
                     indices04.append(fuckyouarray)
                 facemat04.append(f"{mesh.materials[face.material_index].name}")
-                #strips04 += (f" {intb(vc)} ")
-                #for x in TMPstrip:
-                #    strips04 += (f"{x} ") 
+ 
             else:
                 fuckyouarray = [*face.vertices[0:]]
                 if len(fuckyouarray) == 4:         
@@ -155,15 +151,10 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
                 else:
                     indices03.append(fuckyouarray)
                 facemat03.append(f"{mesh.materials[face.material_index].name}")
-                #strips03 += (f"{intb(vc)}")
-                #for x in TMPstrip:
-                #    strips03 += (f"{x} ") 
+
             TMPstrip.clear()
             teststrip.clear()
-
-        #print(f"(EXPERIMENTAL) Strips (Type 04): {indices04}")
-        #print(f"(EXPERIMENTAL) Strips (Type 03): {indices03}")
-        
+            
         matindex03 = []
         matindex04 = []
         for x in facemat04:
@@ -184,12 +175,12 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
         tmpout = ""
         for x in strips03:
             tmpout += (f"{intb(len(x))} {batchint(x)} ")
-        tris03array = (f"{intb(trismagic03)} {intb(len(strips03))} {getsizebytes(tmpout)} {tmpout}")
+        tris03array = (f"{intb(AMO_tristrip_03_data)} {intb(len(strips03))} {getsizebytes(tmpout)} {tmpout}")
 
         tmpout = ""
         for x in strips04:
             tmpout += (f"{intb(len(x))} {batchint(x)} ")
-        tris04array = (f"{intb(trismagic04)} {intb(len(strips04))} {getsizebytes(tmpout)} {tmpout}")
+        tris04array = (f"{intb(AMO_tristrip_04_data)} {intb(len(strips04))} {getsizebytes(tmpout)} {tmpout}")
 
         tmpout1 = ""
         for x in stripmat03:
@@ -225,7 +216,7 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
             xyz = vert.co.xyz
             #print(f"{round(xyz[1],7):<{10}}, {round(xyz[2],7):<{10}}, {round(xyz[0],7):<{10}}")
             vcoords += f"{floatb(xyz[1])} {floatb(xyz[2])} {floatb(xyz[0])} " #blender's y is z in gio
-        out = f"{intb(vertexmagic)} {intb(vertexcount)} {getsizebytes(vcoords)} {vcoords}"
+        out = f"{intb(AMO_vertex_coordinates)} {intb(vertexcount)} {getsizebytes(vcoords)} {vcoords}"
         return out
 
     def getnormals(mesh):
@@ -236,7 +227,7 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
             vnorm = vert.normal
             #print(f"{round(vnorm[1],7):<{10}}, {round(vnorm[2],7):<{10}}, {round(vnorm[0],7):<{10}}")
             norms += f"{floatb(vnorm[1])} {floatb(vnorm[2])} {floatb(vnorm[0])} "
-        out = f"{intb(normalmagic)} {intb(vertexcount)} {getsizebytes(norms)} {norms}"
+        out = f"{intb(AMO_vertex_normals)} {intb(vertexcount)} {getsizebytes(norms)} {norms}"
         return out
 
     def singleUV(intindex):
@@ -256,7 +247,7 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
                 uv = (singleUV(x)[0], singleUV(x)[1])
             uvcoords += f"{floatb(uv[0])} {floatb(1-uv[1])} "
             print(f"Vertex {x} UV: {round(uv[0],3):<{5}}, {round(uv[1],3):<{5}}")
-        out = f"{intb(vertUVmagic)} {intb(vertexcount)} {getsizebytes(uvcoords)} {uvcoords}"
+        out = f"{intb(AMO_vertex_UVs)} {intb(vertexcount)} {getsizebytes(uvcoords)} {uvcoords}"
         return out
 
     def getcolors(mesh):
@@ -270,13 +261,13 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
                 cA= clamp(i.color[3] * 255, 0, 255)
                 print(f"R: {round(cR,3):<{8}}, G: {round(cG,3):<{8}}, B: {round(cB,3):<{8}}, A: {round(cA,3):<{8}}")
                 colors += f"{floatb(cR)} {floatb(cG)} {floatb(cB)} {floatb(cA)} "
-            out = f"{intb(vcolormagic)} {intb(vertexcount)} {getsizebytes(colors)} {colors}"
+            out = f"{intb(AMO_vertex_colors)} {intb(vertexcount)} {getsizebytes(colors)} {colors}"
             return out
         else:
             print("No active color attributes found, writing 255,255,255,255 instead.")
             for x in range(vertexcount):
                 colors += f"{floatb(255)} {floatb(255)} {floatb(255)} {floatb(255)} "
-            out = f"{intb(vcolormagic)} {intb(vertexcount)} {getsizebytes(colors)} {colors}"
+            out = f"{intb(AMO_vertex_colors)} {intb(vertexcount)} {getsizebytes(colors)} {colors}"
             return out
 
     def getvweights(mesh):
@@ -300,7 +291,7 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
                 bones+= f"01000000 {intb(int(tmpvg[0], 16))} {floatb(tmpvg[1]*100)} "
             tmpvg.clear()
         if len(bones) > 0:
-            out = f"{intb(weightmagic)} {intb(vertexcount)} {getsizebytes(bones)} {bones}"
+            out = f"{intb(AMO_vertex_groups)} {intb(vertexcount)} {getsizebytes(bones)} {bones}"
         return out
 
     def writeattributes(type, cull0x10):
@@ -329,7 +320,7 @@ def write_some_data(context, filepath, attrib, amomat, tim2res, oktris, okweight
             attribs = (f"{batchint(other)}{batchint(end)}")
         if cull0x10 == True:
             attribs = attribs[:37] + '1' + attribs[38:]
-        out = f"{intb(attribmagic)} {intb(1)} {getsizebytes(attribs)} {attribs}"
+        out = f"{intb(AMO_mesh_attributes)} {intb(1)} {getsizebytes(attribs)} {attribs}"
         return out
 
     def writematerials(count, type, res):
