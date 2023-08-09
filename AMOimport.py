@@ -24,31 +24,31 @@ bl_info = {
 }
 
 sector_type_dict = {
-    1       : "AMO_magic",
-    131072  : "AMO_unknown", #something about RAM?
-    2       : "AMO_model_container", #game func: GetModelNum
-    4       : "AMO_mesh_container",
-    5       : "AMO_tristrip_container",  #GetIndexListAMOModelMesh
-    196608  : "AMO_tristrip_03_data",
-    262144  : "AMO_tristrip_04_data", ####triangles with multiple bone deformations
-    327680  : "AMO_material_list", #######per mesh material
-    393216  : "AMO_material_per_strip",
-    458752  : "AMO_vertex_coordinates",  #GetVertexAMOModelMesh
-    524288  : "AMO_vertex_normals",      #GetNormalAMOModelMesh
-    655360  : "AMO_vertex_UVs",          #
-    720896  : "AMO_vertex_colors",       #GetVertexColorAMOModelMesh
-    786432  : "AMO_vertex_groups",       #GetWeightAMOModelMesh
-    1114112 : "AMO_hitbox_identifier", ###bounding model fetch, used for stages
-    983040  : "AMO_mesh_attributes",     #PlAMOGetModelAttributes
-    9       : "AMO_material_properties", #global
-    10      : "AMO_texture_properties"
+    0x00000001 : "AMO_magic",
+    0x00020000 : "AMO_unknown",             #something about RAM?
+    0x00000002 : "AMO_model_container",     #game func: GetModelNum
+    0x00000004 : "AMO_mesh_container",
+    0x00000005 : "AMO_tristrip_container",  #GetIndexListAMOModelMesh
+    0x00030000 : "AMO_tristrip_03_data",
+    0x00040000 : "AMO_tristrip_04_data",    #triangles with multiple bone deformations
+    0x00050000 : "AMO_material_list",       #per mesh material
+    0x00060000 : "AMO_material_per_strip",
+    0x00070000 : "AMO_vertex_coordinates",  #GetVertexAMOModelMesh
+    0x00080000 : "AMO_vertex_normals",      #GetNormalAMOModelMesh
+    0x000A0000 : "AMO_vertex_UVs",
+    0x000B0000 : "AMO_vertex_colors",       #GetVertexColorAMOModelMesh
+    0x000C0000 : "AMO_vertex_groups",       #GetWeightAMOModelMesh
+    0x000F0000 : "AMO_mesh_attributes",     #PlAMOGetModelAttributes
+    0x00110000 : "AMO_hitbox_identifier",   #bounding model fetch, used for stages
+    0x00000009 : "AMO_material_properties", #global
+    0x0000000A : "AMO_texture_properties"
     }
 
 model_type_dict = { #######where are materials 2 and 4 ?????
-    0 : "VFX", #eff00.pzz meshes
-    1 : "CelShaded",
-    3 : "Shadeless", #used on transparent meshes
-    5 : "Static" #loading screens, stage objects, etc
+    0x00000000 : "VFX",       #eff00.pzz meshes
+    0x00000001 : "CelShaded",
+    0x00000003 : "Shadeless", #used on transparent meshes
+    0x00000005 : "Static"     #loading screens, stage objects, etc
     }
 
 def int16_read(buf, offset):
@@ -346,7 +346,7 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
     collection.objects.link(created_mesh)
     
     if upflag:
-        created_mesh.rotation_euler = (1.5708, 0.0000, 3.1416)
+        created_mesh.rotation_euler = (math.radians(90), 0.0, math.radians(180))
     
     for mat_index in mat_list:
         for mat in material_list:
@@ -591,17 +591,7 @@ class ImportSomeData(Operator, ImportHelper):
         description="Rotates the objects so the meshes face up in the Z axis.",
         default=True,
     )
-
-#    type: EnumProperty(
-#        name="Example Enum",
-#        description="Choose between two items",
-#        items=(
-#            ('OPT_A', "First Option", "Description one"),
-#            ('OPT_B', "Second Option", "Description two"),
-#        ),
-#        default='OPT_A',
-#    )
-
+    
     def execute(self, context):
         return read_some_data(context, self.filepath, self.z_up) # self.use_setting
 
