@@ -17,7 +17,7 @@ Blender scripts to manage model files from the Artistoon engine. Only tested wit
 ## Model Exporter (AMO)
 ### To-do
 - Separate textures from materials
-- - Find better solution for Triangle Strips
+- Find better solution for Triangle Strips
 - Use material custom properties when available
 - Export collision data sectors (`00110000`) when available
 - Use per-object attributes from the import script when available
