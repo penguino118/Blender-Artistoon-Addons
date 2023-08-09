@@ -1,16 +1,23 @@
 # Blender Artistoon Model Addons
 Blender scripts to manage model files from the Artistoon engine. Only tested with [**GioGio's Bizarre Adventure (PS2)**](https://jojowiki.com/GioGio%27s_Bizarre_Adventure).<br>
 
-## Exporter To-Do
-- Find better solution for Triangle Strips
-- Add more material and attribute types
-- Separate textures from materials
-- Use material type custom properties whenever possible
-- Export collision data sectors (`11000000`) if found
-- Use per-object attributes from the import script whenever possible
-
-## Importer To-Do
-- Add more material types
+## Model Importer (AMO)
+### To-do
+- Support Auto Modellista meshes
 - Figure out unknown attribute flags
-- Read collision data sectors (`11000000`)
-- Add material type as a custom property for the exporter
+- Read collision data sectors (`00110000`)
+- Add remaining material data as a custom properties
+
+## Armature Importer (AHI)
+### To-do
+- Create an exporter
+- There might be more bone types in UI meshes...?
+- Add tree-root data sector (`00000000`) data as custom properties
+
+## Model Exporter (AMO)
+### To-do
+- Separate textures from materials
+- - Find better solution for Triangle Strips
+- Use material custom properties when available
+- Export collision data sectors (`00110000`) when available
+- Use per-object attributes from the import script when available
