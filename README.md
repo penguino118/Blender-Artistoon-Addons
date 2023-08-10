@@ -12,7 +12,6 @@ Blender scripts to manage model files from the Artistoon engine. Only tested wit
 ### To-do
 - Create an exporter
 - There might be more bone types in UI meshes...?
-- Add tree-root data sector (`00000000`) data as custom properties
 
 ## Model Exporter (AMO)
 ### To-do
