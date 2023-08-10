@@ -56,6 +56,12 @@ def print_sector(sector):
         print("invalid sector!! size under 3")
     print(f"Sector Type: {sector[0]}, Data Count: {sector[1]}, Size: {sector[2]}")
 
+def get_tree_root_bones(buf, offset, bone_count, list):
+    for x in range(bone_count):
+        root_bone = int32_read(buf, offset)
+        list.append(root_bone)
+        offset += 0x4
+
 def get_bone(buf, offset, bone_count, bone_data, bone_matrix):
     bone_ID        = int32_read(buf, offset)
     bone_parent_ID = int32_read(buf, offset+0x4)
@@ -88,7 +94,7 @@ def get_bone(buf, offset, bone_count, bone_data, bone_matrix):
     #print(mat_out)
     
 
-def build_armature(collection, filename, bone_count, bone_data, bone_matrix, upflag):
+def build_armature(collection, filename, bone_count, root_bones, bone_data, bone_matrix, upflag):
     object_name = f"{filename}" 
     target_armature = bpy.data.armatures.new(object_name)
     target_armature.display_type = 'ENVELOPE'
@@ -96,6 +102,9 @@ def build_armature(collection, filename, bone_count, bone_data, bone_matrix, upf
     created_armature = bpy.data.objects.new(object_name, target_armature)
     collection.objects.link(created_armature)
     bpy.context.view_layer.objects.active = created_armature
+    
+    if len(root_bones) != 0:
+        created_armature['root_bones'] = root_bones
     
     if upflag:
         created_armature.rotation_euler = (math.radians(90), 0.0, math.radians(180))
@@ -143,6 +152,7 @@ def read_AHI(filedata, filepath, z_up):
         for x in range(sector_count):
             main_sector = get_sector_header(filebuffer, read_offset)
             if main_sector[0] == "AHI_tree_root":
+                get_tree_root_bones(filebuffer, read_offset+0xC, main_sector[1], root_bones)
                 print_sector(main_sector)
                 read_offset += main_sector[2]
             elif main_sector[0] == "AHI_bone_type_1":
@@ -156,7 +166,7 @@ def read_AHI(filedata, filepath, z_up):
             else:
                 print_sector(main_sector)
         
-        build_armature(collection, filename, bone_count, bone_data, bone_matrix, z_up)
+        build_armature(collection, filename, bone_count, root_bones, bone_data, bone_matrix, z_up)
 
 def read_some_data(context, filepath, z_up):
     print("running read_some_data...")
