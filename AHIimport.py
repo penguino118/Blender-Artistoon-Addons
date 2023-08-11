@@ -62,7 +62,7 @@ def get_tree_root_bones(buf, offset, bone_count, list):
         list.append(root_bone)
         offset += 0x4
 
-def get_bone(buf, offset, bone_count, bone_data, bone_matrix):
+def get_bone(buf, offset, bone_count, bone_data, bone_matrix, type):
     bone_ID        = int32_read(buf, offset)
     bone_parent_ID = int32_read(buf, offset+0x4)
     bone_child_ID  = int32_read(buf, offset+0x8)
@@ -89,7 +89,7 @@ def get_bone(buf, offset, bone_count, bone_data, bone_matrix):
     if bone_parent_ID != 4294967295:
         mat_out += bone_matrix[bone_parent_ID]
     
-    bone_data.append( [bone_ID, bone_parent_ID, bone_child_ID, bone_unk1, bone_unk2] )
+    bone_data.append( [bone_ID, bone_parent_ID, bone_child_ID, bone_unk1, bone_unk2, type] )
     bone_matrix.append(mat_out)
     #print(mat_out)
     
@@ -115,8 +115,9 @@ def build_armature(collection, filename, bone_count, root_bones, bone_data, bone
         bone_name   = bone_data[x][0]
         bone_parent = bone_data[x][1]
         bone_child  = bone_data[x][2]
-        bone_unk1  = bone_data[x][3]
-        bone_unk2  = bone_data[x][4]
+        bone_unk1   = bone_data[x][3]
+        bone_unk2   = bone_data[x][4]
+        bone_type   = bone_data[x][5]
         #print(bone_parent)
         bone = target_armature.edit_bones.new(str(bone_name))
         bone.parent = target_armature.edit_bones[str(bone_parent)] if bone_parent != 4294967295 else None
@@ -124,9 +125,11 @@ def build_armature(collection, filename, bone_count, root_bones, bone_data, bone
         bone.matrix = bone_matrix[x]
         
         bpy.ops.object.mode_set(mode='OBJECT')
-        target_armature.bones.get(str(bone_name))['bone_child']    = bone_child if bone_child != 4294967295 else -1
+        target_armature.bones.get(str(bone_name))['bone_type'] = bone_type  if bone_type  != 4294967295 else -1
+        target_armature.bones.get(str(bone_name))['bone_child'] = bone_child if bone_child != 4294967295 else -1
         target_armature.bones.get(str(bone_name))['bone_unknown1'] = bone_unk1  if bone_unk1  != 4294967295 else -1
         target_armature.bones.get(str(bone_name))['bone_unknown2'] = bone_unk2  if bone_unk2  != 4294967295 else -1
+        
 
 def read_AHI(filedata, filepath, z_up):
     filebuffer = filedata
@@ -157,11 +160,11 @@ def read_AHI(filedata, filepath, z_up):
                 read_offset += main_sector[2]
             elif main_sector[0] == "AHI_bone_type_1":
                 print_sector(main_sector)
-                get_bone(filebuffer, read_offset+0xC, bone_count, bone_data, bone_matrix)
+                get_bone(filebuffer, read_offset+0xC, bone_count, bone_data, bone_matrix, 1)
                 read_offset += main_sector[2]
             elif main_sector[0] == "AHI_bone_type_2":
                 print_sector(main_sector)
-                get_bone(filebuffer, read_offset+0xC, bone_count, bone_data, bone_matrix)
+                get_bone(filebuffer, read_offset+0xC, bone_count, bone_data, bone_matrix, 2)
                 read_offset += main_sector[2]
             else:
                 print_sector(main_sector)
