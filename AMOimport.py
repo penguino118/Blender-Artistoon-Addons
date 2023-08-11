@@ -73,7 +73,7 @@ def print_sector(sector):
     print(f"Sector Type: {sector[0]}, Data Count: {sector[1]}, Size: {sector[2]}")
 
 def create_material(filename, index, material_type, texture_index, material_list):
-    material_name = f"{filename[:-4]}_mat{index}_tex{texture_index}"
+    material_name = f"{filename[:-4]}_mat{index}"
     material = bpy.data.materials.new(material_name) 
     material_list.append(material)
     material.use_nodes = True
@@ -184,13 +184,23 @@ def create_material(filename, index, material_type, texture_index, material_list
         links.new(material_output.inputs['Surface'], imgnode.outputs[0])
     return
     
+def create_textures(filename, texlist):
+    for x in range(len(texlist)):
+        tex_index  = texlist[x][0]
+        tex_width  = texlist[x][1]
+        tex_height = texlist[x][2]
+        texture_name = f"{filename[:-4]}_tex{x}"
+        texture = bpy.data.textures.new(texture_name, 'IMAGE')
+        texture['img_index']  = tex_index
+        texture['tex_width']  = tex_width
+        texture['tex_height'] = tex_height
 
 def build_materials(filename, buffer, offset, material_start, material_list):
     print("Building materials...")
     offset += material_start
     material_properties = get_sector_header(buffer, offset)
-    print("hi good mornign")
     tmp_mat_list = []
+    tmp_tex_list = []
     if material_properties[0] == "AMO_material_properties":
         print_sector(material_properties)
         offset += 0xC
@@ -211,17 +221,17 @@ def build_materials(filename, buffer, offset, material_start, material_list):
     texture_properties = get_sector_header(buffer, offset)
     if texture_properties[0] == "AMO_texture_properties":
         print_sector(texture_properties)
-        #print("lin128,",hex(offset))
         offset += 0xC
-        #print("lin130,",hex(offset))
-        #offset += texture_properties[2]
         for x in range(texture_properties[1]):
-            tex_skip = int32_read(buffer, offset+0x8)
-            tex_index = int32_read(buffer, offset+0xC)
-            #print(f"texskip = {tex_skip} // texindex = {tex_index} // offset+0xC = {hex(offset+0xC)}")
+            buf_skip = int32_read(buffer, offset+0x8)
+            tex_index  = int32_read(buffer, offset+0xC)
+            tex_width  = int32_read(buffer, offset+0x10)
+            tex_height = int32_read(buffer, offset+0x14)
+            tmp_tex_list.append([tex_index, tex_width, tex_height])
             mat_type = tmp_mat_list[x]
             create_material(filename, x, mat_type, tex_index, material_list)
-            offset += tex_skip
+            offset += buf_skip
+        create_textures(filename, tmp_tex_list)
         
 
 def get_indices(buffer, offset, sector_size, strip_count, list, tmp_strip_length):
@@ -353,6 +363,8 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
     for mat_index in mat_list:
         for mat in material_list:
             testname = mat.name.split("_")[-1][3:]
+            if '.' in testname: #duplicate material
+                testname = testname.split(".")[0]
             if testname == str(mat_index):
                 target_mesh.materials.append(mat)
     
