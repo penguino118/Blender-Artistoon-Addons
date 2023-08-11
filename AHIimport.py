@@ -220,7 +220,7 @@ class ImportSomeData(Operator, ImportHelper):
 
     z_up: BoolProperty(
         name="Rotate Z to up",
-        description="Rotates the objects so the meshes face up in the Z axis.",
+        description="Rotates the object so it faces up in the Z axis.",
         default=True,
     )
 
