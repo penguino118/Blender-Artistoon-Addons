@@ -86,12 +86,13 @@ def create_material(filename, index, material_type, texture_index, material_list
     unkproperty4 = material_property[index][4]
     unkproperty5 = material_property[index][5]
     
-    material['tex_index'] = material_property[index][0]
+    material['mat_type'] = material_property[index][0]
     material['unknown_1'] = unkproperty1
     material['unknown_2'] = unkproperty2
     material['unknown_3'] = unkproperty3
     material['unknown_4'] = unkproperty4
     material['unknown_5'] = unkproperty5
+    material['tex_image'] = material_property[index][6]
     
     #bsdf = 
     if nodes.get("Principled BSDF") != None:
@@ -228,9 +229,9 @@ def build_materials(filename, buffer, offset, material_start, material_list):
             unk3 = float_read(buffer, offset+0x2C), float_read(buffer, offset+0x30), float_read(buffer, offset+0x34), float_read(buffer, offset+0x38)
             unk4 = float_read(buffer, offset+0x3C)
             unk5 = int32_read(buffer, offset+0x40)
+            texture = int32_read(buffer, offset+0x10C)
             
-            
-            mat_property.append([type_test, unk1, unk2, unk3, unk4, unk5])
+            mat_property.append([type_test, unk1, unk2, unk3, unk4, unk5, texture])
             mat_skip = int32_read(buffer, offset+0x8)
             print(f"typetest= {type_test} // matskip = {mat_skip}")
             if type_test in model_type_dict:
