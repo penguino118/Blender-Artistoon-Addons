@@ -1,16 +1,9 @@
 import bpy
+import os
 import struct
 import bmesh
-from collections import defaultdict
 import math
 import mathutils
-from mathutils import Matrix, Vector, Color, Euler
-from bpy_extras import io_utils, node_shader_utils
-from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, BoolProperty, EnumProperty
-from bpy.types import Operator
-import bpy.path
-import os
 
 bl_info = {
     "name": "Artistoon Model Importer",
@@ -303,6 +296,8 @@ def get_vert_groups(buffer, offset, sector_size, vertex_count, list):
             return
 
 def get_mesh_attributes(buffer, offset, sector_size, list):
+    offset -= 0xC
+    
     attribute_offsets = [
     0x0C, #max render distance
     0x10, #aa_material (dunno what it do lol)
@@ -326,7 +321,13 @@ def get_mesh_attributes(buffer, offset, sector_size, list):
     for attribute_offset in attribute_offsets:
         value = int32_read(buffer, offset + attribute_offset)
         list.append(value)
-    print(list)
+    #print(list)
+
+def get_mesh_hit(buf, offset, count, list):
+    for x in range(count):
+        unk1 = (int16_read(buf, offset), int16_read(buf, offset+0x2), int16_read(buf, offset+0x4), int16_read(buf, offset+0x6))
+        unk2 = (float_read(buf, offset+0x8), float_read(buf, offset+0xC))
+        list.append([unk1, unk2])
 
 def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
     indices       = mesh_data[0]
@@ -337,8 +338,9 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
     vertUVs       = mesh_data[5]
     vertcolors    = mesh_data[6]
     vertweights   = mesh_data[7]
-    material_list = mesh_data[8]
-    attributes    = mesh_data[9]
+    attributes    = mesh_data[8]
+    hitbox_fetch  = mesh_data[9]
+    material_list = mesh_data[10]
     
     mesh_name = f"{filename[:-4]}_mesh{index}" 
     target_mesh = bpy.data.meshes.new(mesh_name)
@@ -350,7 +352,7 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
     
     for mat_index in mat_list:
         for mat in material_list:
-            testname = mat.name.split("_")[2][3:]
+            testname = mat.name.split("_")[-1][3:]
             if testname == str(mat_index):
                 target_mesh.materials.append(mat)
     
@@ -419,6 +421,10 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
         created_mesh.data['aa_unknown_0x10'] = attributes[0x10]
         created_mesh.data['aa_unknown_0x11'] = attributes[0x11]
     
+    for x in range(len(hitbox_fetch)):
+        created_mesh.data[f'bounding_{x}_unk1'] = hitbox_fetch[x][0]
+        created_mesh.data[f'bounding_{x}_unk2'] = hitbox_fetch[x][1]
+    
     loop_normals = []
     for l in target_mesh.loops:
         loop_normals.append(vertnormals[l.vertex_index])
@@ -476,6 +482,7 @@ def amo_read(filedata, filepath, upflag):
             mesh_vertex_UVs       = []
             mesh_vertex_colors    = []
             mesh_vertex_weights   = []
+            mesh_hitbox_fetch     = []
             mesh_attributes       = []
             
             print(f"model index: {model_index} // read offset: {hex(read_offset)}")
@@ -530,10 +537,11 @@ def amo_read(filedata, filepath, upflag):
                     read_offset += main_sector[2]
                 
                 elif main_sector[0] == "AMO_mesh_attributes":
-                    get_mesh_attributes(filebuffer, read_offset, read_offset+main_sector[2], mesh_attributes)
+                    get_mesh_attributes(filebuffer, read_offset+0xC, read_offset+main_sector[2], mesh_attributes)
                     read_offset += main_sector[2]
 
                 elif main_sector[0] == "AMO_hitbox_identifier":
+                    get_mesh_hit(filebuffer, read_offset+0xC, main_sector[1], mesh_hitbox_fetch)
                     read_offset += main_sector[2] #todo
                 
             mesh_data = [
@@ -545,8 +553,9 @@ def amo_read(filedata, filepath, upflag):
             mesh_vertex_UVs, 
             mesh_vertex_colors,
             mesh_vertex_weights,
-            model_materials,
-            mesh_attributes
+            mesh_attributes,
+            mesh_hitbox_fetch,
+            model_materials
             ]
             build_mesh(collection, model_index, filename, mesh_data, tmp_strip_length, upflag)
 
