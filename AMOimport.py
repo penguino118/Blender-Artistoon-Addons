@@ -72,12 +72,26 @@ def print_sector(sector):
         print("invalid sector!! size under 3")
     print(f"Sector Type: {sector[0]}, Data Count: {sector[1]}, Size: {sector[2]}")
 
-def create_material(filename, index, material_type, texture_index, material_list):
+def create_material(filename, index, material_type, texture_index, material_list, material_property):
     material_name = f"{filename[:-4]}_mat{index}"
     material = bpy.data.materials.new(material_name) 
     material_list.append(material)
     material.use_nodes = True
     nodes = material.node_tree.nodes
+    
+    print(material_property)
+    unkproperty1 = material_property[index][1]
+    unkproperty2 = material_property[index][2]
+    unkproperty3 = material_property[index][3]
+    unkproperty4 = material_property[index][4]
+    unkproperty5 = material_property[index][5]
+    
+    material['tex_index'] = material_property[index][0]
+    material['unknown_1'] = unkproperty1
+    material['unknown_2'] = unkproperty2
+    material['unknown_3'] = unkproperty3
+    material['unknown_4'] = unkproperty4
+    material['unknown_5'] = unkproperty5
     
     #bsdf = 
     if nodes.get("Principled BSDF") != None:
@@ -199,6 +213,7 @@ def build_materials(filename, buffer, offset, material_start, material_list):
     print("Building materials...")
     offset += material_start
     material_properties = get_sector_header(buffer, offset)
+    mat_property = []
     tmp_mat_list = []
     tmp_tex_list = []
     if material_properties[0] == "AMO_material_properties":
@@ -207,6 +222,15 @@ def build_materials(filename, buffer, offset, material_start, material_list):
         print(filename)
         for x in range(material_properties[1]):
             type_test = int32_read(buffer, offset)
+            
+            unk1 = float_read(buffer, offset+0x0C), float_read(buffer, offset+0x10), float_read(buffer, offset+0x14), float_read(buffer, offset+0x18)
+            unk2 = float_read(buffer, offset+0x1C), float_read(buffer, offset+0x20), float_read(buffer, offset+0x24), float_read(buffer, offset+0x28)
+            unk3 = float_read(buffer, offset+0x2C), float_read(buffer, offset+0x30), float_read(buffer, offset+0x34), float_read(buffer, offset+0x38)
+            unk4 = float_read(buffer, offset+0x3C)
+            unk5 = int32_read(buffer, offset+0x40)
+            
+            
+            mat_property.append([type_test, unk1, unk2, unk3, unk4, unk5])
             mat_skip = int32_read(buffer, offset+0x8)
             print(f"typetest= {type_test} // matskip = {mat_skip}")
             if type_test in model_type_dict:
@@ -229,7 +253,7 @@ def build_materials(filename, buffer, offset, material_start, material_list):
             tex_height = int32_read(buffer, offset+0x14)
             tmp_tex_list.append([tex_index, tex_width, tex_height])
             mat_type = tmp_mat_list[x]
-            create_material(filename, x, mat_type, tex_index, material_list)
+            create_material(filename, x, mat_type, tex_index, material_list, mat_property)
             offset += buf_skip
         create_textures(filename, tmp_tex_list)
         
