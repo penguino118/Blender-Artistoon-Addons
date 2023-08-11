@@ -3,9 +3,8 @@ Blender scripts to manage model files from the Artistoon engine. Only tested wit
 
 ## Model Importer (AMO)
 ### To-do
-- Support Auto Modellista meshes
+- Support Auto Modellista meshes...?
 - Figure out unknown attribute flags
-- Read collision data sectors (`00110000`)
 - Add remaining material data as a custom properties
 
 ## Armature Importer (AHI)
