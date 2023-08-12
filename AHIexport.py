@@ -1,6 +1,17 @@
 import bpy
 import struct
 
+bl_info = {
+    "name": "Artistoon Armature Exporter",
+    "description": "Exporter for the Artistoon Armature Format (AHI) found in GioGio's Bizarre Adventure.",
+    "author": "Penguino",
+    "version": (1, 0),
+    "blender": (3, 6, 1),
+    "location": "File > Export",
+    "warning": "", # used for warning icon and text in addons panel
+    "category": "Export",
+}
+
 def write_int32(int):
     tmp = f"{struct.unpack('>I', struct.pack('<I', int))[0]:08X}"
     return tmp
@@ -127,7 +138,7 @@ from bpy.props import StringProperty, BoolProperty, EnumProperty
 from bpy.types import Operator
 
 
-class ExportSomeData(Operator, ExportHelper):
+class Export_AHI(Operator, ExportHelper):
     """Export selected armature object as Artistoon Armature data."""
     bl_idname = "export_scene.ahi"  # important since its how bpy.ops.import_test.some_data is constructed
     bl_label = "Export Artistoon Armature"
@@ -165,17 +176,17 @@ class ExportSomeData(Operator, ExportHelper):
 
 # Only needed if you want to add into a dynamic menu
 def menu_func_export(self, context):
-    self.layout.operator(ExportSomeData.bl_idname, text="Artistoon Armature (.ahi)")
+    self.layout.operator(Export_AHI.bl_idname, text="Artistoon Armature (.ahi)")
 
 
 # Register and add to the "file selector" menu (required to use F3 search "Text Export Operator" for quick access).
 def register():
-    bpy.utils.register_class(ExportSomeData)
+    bpy.utils.register_class(Export_AHI)
     bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
 def unregister():
-    bpy.utils.unregister_class(ExportSomeData)
+    bpy.utils.unregister_class(Export_AHI)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 
 
