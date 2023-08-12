@@ -89,7 +89,7 @@ def get_bone(buf, offset, bone_count, bone_data, bone_matrix, type):
     if bone_parent_ID != 4294967295:
         mat_out += bone_matrix[bone_parent_ID]
     
-    bone_data.append( [bone_ID, bone_parent_ID, bone_child_ID, bone_unk1, bone_unk2, type] )
+    bone_data.append( [bone_ID, bone_parent_ID, bone_child_ID, bone_unk1, bone_unk2, type, scale] )
     bone_matrix.append(mat_out)
     #print(mat_out)
     
@@ -116,8 +116,9 @@ def build_armature(collection, filename, bone_count, root_bones, bone_data, bone
         bone_parent = bone_data[x][1]
         bone_child  = bone_data[x][2]
         bone_unk1   = bone_data[x][3]
-        bone_unk2   = bone_data[x][4]
+        bone_mesh   = bone_data[x][4]
         bone_type   = bone_data[x][5]
+        bone_scale  = bone_data[x][6]
         #print(bone_parent)
         bone = target_armature.edit_bones.new(str(bone_name))
         bone.parent = target_armature.edit_bones[str(bone_parent)] if bone_parent != 4294967295 else None
@@ -128,7 +129,8 @@ def build_armature(collection, filename, bone_count, root_bones, bone_data, bone
         target_armature.bones.get(str(bone_name))['bone_type'] = bone_type  if bone_type  != 4294967295 else -1
         target_armature.bones.get(str(bone_name))['bone_child'] = bone_child if bone_child != 4294967295 else -1
         target_armature.bones.get(str(bone_name))['bone_unknown1'] = bone_unk1  if bone_unk1  != 4294967295 else -1
-        target_armature.bones.get(str(bone_name))['bone_unknown2'] = bone_unk2  if bone_unk2  != 4294967295 else -1
+        target_armature.bones.get(str(bone_name))['trans_inherit_mesh'] = bone_mesh  if bone_mesh  != 4294967295 else -1
+        target_armature.bones.get(str(bone_name))['bone_scale'] = bone_scale
         
 
 def read_AHI(filedata, filepath, z_up):
