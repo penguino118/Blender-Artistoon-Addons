@@ -191,7 +191,7 @@ from bpy.props import StringProperty, BoolProperty, EnumProperty
 from bpy.types import Operator
 
 
-class Import_AMO(Operator, ImportHelper):
+class Import_AHI(Operator, ImportHelper):
     """Import Artistoon Armature data into a new collection."""
     bl_idname = "import_scene.ahi"  # important since its how bpy.ops.import_test.some_data is constructed
     bl_label = "Import Artistoon Armature"
@@ -235,17 +235,17 @@ class Import_AMO(Operator, ImportHelper):
 
 # Only needed if you want to add into a dynamic menu.
 def menu_func_import(self, context):
-    self.layout.operator(Import_AMO.bl_idname, text="Artistoon Armature (.ahi)")
+    self.layout.operator(Import_AHI.bl_idname, text="Artistoon Armature (.ahi)")
 
 
 # Register and add to the "file selector" menu (required to use F3 search "Text Import Operator" for quick access).
 def register():
-    bpy.utils.register_class(Import_AMO)
+    bpy.utils.register_class(Import_AHI)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
 
 def unregister():
-    bpy.utils.unregister_class(Import_AMO)
+    bpy.utils.unregister_class(Import_AHI)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
 
 
