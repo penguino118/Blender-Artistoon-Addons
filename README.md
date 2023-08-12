@@ -8,8 +8,12 @@ Blender scripts to manage model files from the Artistoon engine. Only tested wit
 
 ## Armature Importer (AHI)
 ### To-do
-- Create an exporter
-- There might be more bone types in UI meshes...?
+- Figure out unknown attribute flags
+
+## Armature Exporter (AHI)
+### To-do
+- Rotation isn't always correct (?)
+  - Rotation is ocasionally missing for some bones on export, not sure why.
 
 ## Model Exporter (AMO)
 ### To-do
