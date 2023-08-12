@@ -198,19 +198,8 @@ def create_material(filename, index, material_type, texture_index, material_list
         imgnode.location = (-350, 350)
         links.new(material_output.inputs['Surface'], imgnode.outputs[0])
     return
-    
-def create_textures(filename, texlist):
-    for x in range(len(texlist)):
-        tex_index  = texlist[x][0]
-        tex_width  = texlist[x][1]
-        tex_height = texlist[x][2]
-        texture_name = f"{filename[:-4]}_tex{x}"
-        texture = bpy.data.textures.new(texture_name, 'IMAGE')
-        texture['img_index']  = tex_index
-        texture['tex_width']  = tex_width
-        texture['tex_height'] = tex_height
 
-def build_materials(filename, buffer, offset, material_start, material_list):
+def build_materials(collection, filename, buffer, offset, material_start, material_list):
     print("Building materials...")
     offset += material_start
     material_properties = get_sector_header(buffer, offset)
@@ -256,7 +245,11 @@ def build_materials(filename, buffer, offset, material_start, material_list):
             mat_type = tmp_mat_list[x]
             create_material(filename, x, mat_type, tex_index, material_list, mat_property)
             offset += buf_skip
-        create_textures(filename, tmp_tex_list)
+        for x in range(len(tmp_tex_list)):
+            tex_index  = tmp_tex_list[x][0]
+            tex_width  = tmp_tex_list[x][1]
+            tex_height = tmp_tex_list[x][2]
+            collection[f"texture_{x}"] = tex_index, tex_width, tex_height
         
 
 def get_indices(buffer, offset, sector_size, strip_count, list, tmp_strip_length):
@@ -505,7 +498,7 @@ def amo_read(filedata, filepath, upflag):
         collection = bpy.data.collections.new(collection_name)
         bpy.context.scene.collection.children.link(collection)
         model_materials = []
-        build_materials(filename, filebuffer, read_offset, model_container[2], model_materials)
+        build_materials(collection, filename, filebuffer, read_offset, model_container[2], model_materials)
         read_offset += 0xC
         model_count = model_container[1]
         for model_index in range(model_count):
