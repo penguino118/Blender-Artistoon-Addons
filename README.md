@@ -18,3 +18,4 @@ Blender scripts to manage model files from the Artistoon engine. Only tested wit
 ## Model Exporter (AMO)
 ### To-do
 - Find better solution for Triangle Strips
+  -- Current solution is unnefficient and ocasionally messes up list order while handling material per face/strip data.
