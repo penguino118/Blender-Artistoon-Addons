@@ -487,7 +487,7 @@ class Export_AMO(Operator, ExportHelper):
     optimize_attempt: BoolProperty(
         name="Optimize Meshes",
         description="Attempts optimize meshes by joining neighbour triangles into triangle strips.",
-        default=True,
+        default=False,
     )
 
 #    type: EnumProperty(
