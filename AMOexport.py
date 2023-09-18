@@ -217,8 +217,12 @@ def get_indices(object, optimize_attempt):
     out = f"{strip_out} {mat_out} {fmat_out}"
     return out
 
-def stripify(tri_list, mat_list, pass_count, new_tris, new_mats):
+def stripify(ogtris, ogmats, pass_count, new_tris, new_mats):
+    tri_list = ogtris
+    mat_list = ogmats
+    
     removecount = 0
+    
     for passindex in range(pass_count):
         for index in range(len(tri_list)-1):
             
@@ -238,11 +242,11 @@ def stripify(tri_list, mat_list, pass_count, new_tris, new_mats):
                     build_strip(tri_list[index], tri_list[index+1], index, tri_list, mat_list, new_tris, new_mats, 3)
                     removecount = removecount+1
                 
-#                elif triscompared == 0:
-#                    tri_list.insert(len(tri_list)+1, tri_list[index])
-#                    mat_list.insert(len(mat_list)+1, mat_list[index])
-#                    tri_list.pop(index)
-#                    mat_list.pop(index)
+                elif triscompared == 0:
+                    tri_list.insert(len(tri_list)+1, tri_list[index])
+                    mat_list.insert(len(mat_list)+1, mat_list[index])
+                    tri_list.pop(index)
+                    mat_list.pop(index)
                 
     print(f"Adding remaining triangles ({len(tri_list)})...")
     for x in tri_list:
@@ -291,21 +295,10 @@ def get_vert_normal(object):
     out = ""
     mesh = object.data
     vert_count = int32_write(len(mesh.vertices))
-    mesh.calc_loop_triangles()
-    mesh.calc_normals_split()
     
-    tmpnormal = []
-    for face in mesh.polygons:
-        for vertindex, loopindex in zip(face.vertices, face.loop_indices):
-            normal = mesh.corner_normals[loopindex].vector
-            tmpnormal.append([vertindex, normal])
-    
-    for vert in range(len(mesh.vertices)):
-        added_verts = []
-        for normal in tmpnormal:
-            if normal[0] == vert and vert not in added_verts:
-                out += f"{float_write_list(normal[1])}"
-                added_verts.append(vert)
+    for vert in mesh.vertices:
+        vnorm = vert.normal
+        out += f"{float_write(vnorm[0])} {float_write(vnorm[1])} {float_write(vnorm[2])} "
 
     out = f"{int32_write(0x00080000)} {vert_count} {get_sector_size(out)} {out}"
     return out 
@@ -314,20 +307,21 @@ def get_vert_UVs(object):
     out = ""
     mesh = object.data
     vert_count = int32_write(len(mesh.vertices))
-    
+
     tmpuv = []
     for face in mesh.polygons:
         for vertindex, loopindex in zip(face.vertices, face.loop_indices):
             uv_coords = mesh.uv_layers.active.data[loopindex].uv
             tmpuv.append([vertindex, uv_coords])
     
-    for vert in range(len(mesh.vertices)):
+    for vert in mesh.vertices:
+        vert_index = vert.index
         added_verts = []
         for uv in tmpuv:
-            if uv[0] == vert and vert not in added_verts:
+            if uv[0] == vert_index and vert_index not in added_verts:
                 out += f"{float_write(uv[1][0])} {float_write(1.0 - uv[1][1])}"
-                added_verts.append(vert)
-    out = f"{int32_write(0x000A0000)} {vert_count} {get_sector_size(out)} {out}"
+                added_verts.append(vert_index)
+                
     return out 
 
 def get_vert_color(object):
@@ -423,6 +417,9 @@ def get_amo(optimize):
     for object in collection.objects:
         if object.type == 'MESH':
             
+            object.data.calc_loop_triangles()
+            object.data.calc_normals_split()
+            
             mesh_indices   = get_indices(object, optimize)
             vertex_coords  = get_vert_coord(object)
             vertex_normals = get_vert_normal(object)
@@ -431,6 +428,8 @@ def get_amo(optimize):
             vertex_groups  = get_vert_group(object)
             attributes     = get_attributes(object)
             bounding       = get_bounding(object)
+            
+            object.data.free_normals_split()
             
             sector_count = 0
             if len(mesh_indices) != 0: sector_count += 3
