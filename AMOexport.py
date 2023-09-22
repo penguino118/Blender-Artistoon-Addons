@@ -321,7 +321,7 @@ def get_vert_UVs(object):
             if uv[0] == vert_index and vert_index not in added_verts:
                 out += f"{float_write(uv[1][0])} {float_write(1.0 - uv[1][1])}"
                 added_verts.append(vert_index)
-                
+    out = f"{int32_write(0x000A0000)} {vert_count} {get_sector_size(out)} {out}"
     return out 
 
 def get_vert_color(object):
