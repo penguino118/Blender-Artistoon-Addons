@@ -147,7 +147,6 @@ def get_indices(object, optimize_attempt):
             if len(poly_verts) == 4: #quads
                 poly_verts = [poly_verts[2], poly_verts[3], poly_verts[1], poly_verts[0]]
             strip03.append(poly_verts)
-            print(poly_verts)
             mats03.append(mat)
       
     indices_03 = []
@@ -201,18 +200,22 @@ def get_indices(object, optimize_attempt):
     fmat_03 = ""
     fmat_04 = ""
     
+    facemat_count = 0
+    
     for face_mat in mat_indices_03:
         for mat in mat_list:
             if face_mat == mat:
                 fmat_03 += f"{int32_write(mat_list.index(mat))}"
+                facemat_count +=1
     
     for face_mat in mat_indices_04:
         for mat in mat_list:
             if face_mat == mat:
                 fmat_04 += f"{int32_write(mat_list.index(mat))}"
-    
+                facemat_count +=1
+    print("testval ", facemat_count)
     fmat_out = f"{fmat_04} {fmat_03} " 
-    facemat_count = len(indices_04) + len(indices_03)
+    #facemat_count = testtest #len(indices_04) + len(indices_03)
     fmat_out = f"{int32_write(0x00060000)} {int32_write(facemat_count)} {get_sector_size(fmat_out)} {fmat_out}"
     out = f"{strip_out} {mat_out} {fmat_out}"
     return out
@@ -242,12 +245,6 @@ def stripify(ogtris, ogmats, pass_count, new_tris, new_mats):
                     build_strip(tri_list[index], tri_list[index+1], index, tri_list, mat_list, new_tris, new_mats, 3)
                     removecount = removecount+1
                 
-                elif triscompared == 0:
-                    tri_list.insert(len(tri_list)+1, tri_list[index])
-                    mat_list.insert(len(mat_list)+1, mat_list[index])
-                    tri_list.pop(index)
-                    mat_list.pop(index)
-                
     print(f"Adding remaining triangles ({len(tri_list)})...")
     for x in tri_list:
         new_tris.append(x)
@@ -262,8 +259,6 @@ def compare_tris(tris_A, tris_B, mat_A, mat_B):
         return 2
     elif tris_A[-3] == tris_B[-3] and tris_A[-1] == tris_B[-2] and mat_A == mat_B: #strip up
         return 3
-    else:
-        return 0
     
 def build_strip(tris_A, tris_B, remainder, tri_list, mat_list, new_tris, new_mats, order):
     if order == 1: #right
@@ -307,7 +302,7 @@ def get_vert_UVs(object):
     out = ""
     mesh = object.data
     vert_count = int32_write(len(mesh.vertices))
-
+    
     tmpuv = []
     for face in mesh.polygons:
         for vertindex, loopindex in zip(face.vertices, face.loop_indices):
@@ -321,6 +316,7 @@ def get_vert_UVs(object):
             if uv[0] == vert_index and vert_index not in added_verts:
                 out += f"{float_write(uv[1][0])} {float_write(1.0 - uv[1][1])}"
                 added_verts.append(vert_index)
+                
     out = f"{int32_write(0x000A0000)} {vert_count} {get_sector_size(out)} {out}"
     return out 
 
