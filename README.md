@@ -14,7 +14,7 @@ Blender scripts to manage model files from the Artistoon engine. Only tested wit
 ### To-do
 - Test on more files
 - Set frame range and loop start values when creating animation actions
-- Currently 'Ease In' and 'Ease Out' values aren't used when creating keyframes
+- Probably use FCurve 'Ease In' and 'Ease Out' values for something
 
 ## Model Exporter (AMO)
 ### To-do
