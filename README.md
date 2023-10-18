@@ -10,12 +10,18 @@ Blender scripts to manage model files from the Artistoon engine. Only tested wit
 ### To-do
 - Figure out unknown attribute flags
 
-## Armature Exporter (AHI)
+## Animation Importer (AAN)
 ### To-do
-- Rotation isn't always correct (?)
-  - Rotation is ocasionally missing for some bones on export, not sure why.
+- Test on more files
+- Set frame range and loop start values when creating animation actions
+- Currently 'Ease In' and 'Ease Out' values aren't used when creating keyframes
 
 ## Model Exporter (AMO)
 ### To-do
 - Find better solution for Triangle Strips
   - Current solution is unnefficient and ocasionally messes up list order while handling multiple materials.
+
+## Armature Exporter (AHI)
+### To-do
+- Rotation isn't always correct (?)
+  - Rotation is ocasionally missing for some bones on export, not sure why.
