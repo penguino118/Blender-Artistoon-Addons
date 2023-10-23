@@ -56,19 +56,22 @@ def print_sector(sector):
     print(f"Sector Type: {sector[0]}, Data Count: {sector[1]}, Size: {sector[2]}")
 
 
-def get_keyframe(buffer, offset, type):
-    #value = list[index][0]
+def get_keyframe(buffer, offset, type, action):
     if type == 1:
         value    = float_read(buffer, offset)
         frame    = float_read(buffer, offset+0x4)
         ease_in  = float_read(buffer, offset+0x8)
         ease_out = float_read(buffer, offset+0xC)
+        if frame > action.frame_end:
+            action.frame_end = frame
         return [value, frame, ease_in, ease_out]
     elif type == 2:
         value    = float(signed_int16_read(buffer, offset) / 2607.5946)    
         frame    = signed_int16_read(buffer, offset+0x2)
         ease_in  = float(signed_int16_read(buffer, offset+0x4) / 2607.5946)
         ease_out = float(signed_int16_read(buffer, offset+0x6) / 2607.5946)
+        if frame > action.frame_end:
+            action.frame_end = frame
         return [value, frame, ease_in, ease_out]
 
 
@@ -118,12 +121,20 @@ def read_ahi(data, path):
     for a in range(animation_count):
         animation_name = f"{filename}_act_{a}"
         bpy.data.actions.new(name=animation_name)
+        current_action = bpy.data.actions[animation_name]
+        
         container = get_sector_header(filebuffer, read_offset)
         block_type = int08_read(filebuffer, read_offset)
         total_sectors = container[1]
         read_offset += 0xC
         loop_flag = int32_read(filebuffer, read_offset)
-        loop_flag = float_read(filebuffer, read_offset+0x4)
+        loop_start = float_read(filebuffer, read_offset+0x4)
+        
+        current_action.use_frame_range = True
+        if loop_flag == 1:
+            current_action.use_cyclic = True
+            current_action.frame_start = loop_start
+        
         read_offset += 0x8
         for b in range(total_sectors):
             main_sector = get_sector_header(filebuffer, read_offset)
@@ -143,7 +154,7 @@ def read_ahi(data, path):
                     frame_count = animation[1]
                     keyframes = []
                     for d in range(frame_count):
-                        keyframes.append(get_keyframe(filebuffer, read_offset, block_type))
+                        keyframes.append(get_keyframe(filebuffer, read_offset, block_type, current_action))
                         
                         if block_type == 1:
                             read_offset += 0x10
@@ -162,7 +173,7 @@ def read_ahi(data, path):
                     frame_count = animation[1]
                     keyframes = []
                     for d in range(frame_count):
-                        keyframes.append(get_keyframe(filebuffer, read_offset, block_type))
+                        keyframes.append(get_keyframe(filebuffer, read_offset, block_type, current_action))
                         #set_keyframe(armature, "translation", c, b, keyframe)
                         if block_type == 1:
                             read_offset += 0x10
