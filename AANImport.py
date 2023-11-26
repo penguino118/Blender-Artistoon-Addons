@@ -1,11 +1,11 @@
 import bpy
 import struct
-import os
 
 sector_type_dict = {
     0x80000001  : "AnimationBlock01",
     0x80000002  : "AnimationBlock02",
-    0x0000000C  : "ProbablyImportant",
+    0x80000000  : "ProbablyImportant",
+    #0x0000000C  : "ProbablyImportant",
     0x800001C0  : "TranslationBlock",
     0x80220040  : "TranslationX",
     0x80220080  : "TranslationY",
@@ -74,6 +74,15 @@ def get_keyframe(buffer, offset, type, action):
             action.frame_end = frame
         return [value, frame, ease_in, ease_out]
 
+def set_dummy_keyframe(armature, anim_name, anim_index, index):
+    if not armature.animation_data:
+        armature.animation_data_create()
+    armature.animation_data.action = bpy.data.actions[anim_name]
+    bone = armature.pose.bones[str(index)]
+    bone.keyframe_insert('location', index=0, frame=-1.234)
+    bone.keyframe_insert('location', index=1, frame=-1.234)
+    bone.keyframe_insert('location', index=2, frame=-1.234)
+    
 
 def set_keyframe(armature, anim_name, type, anim_index, axis, index, keyframe_list):
     if not armature.animation_data:
@@ -137,10 +146,12 @@ def read_ahi(data, path):
         
         read_offset += 0x8
         for b in range(total_sectors):
+            print(b, read_offset)
             main_sector = get_sector_header(filebuffer, read_offset)
             
             if main_sector[0] == "ProbablyImportant":
                 print_sector(main_sector)
+                set_dummy_keyframe(armature, animation_name, a, b)
                 read_offset += main_sector[2]
             
             elif main_sector[0] == "TranslationBlock":
@@ -181,6 +192,7 @@ def read_ahi(data, path):
                             read_offset += 0x8
                     set_keyframe(armature, animation_name, "rotation", a, c, b, keyframes)
             else:
+                print(main_sector[0])
                 read_offset += main_sector[2]
                 
 
