@@ -1,5 +1,6 @@
 import bpy
 import struct
+import os 
 
 sector_type_dict = {
     0x80000001  : "AnimationBlock01",
