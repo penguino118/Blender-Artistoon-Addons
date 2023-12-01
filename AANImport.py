@@ -6,7 +6,6 @@ sector_type_dict = {
     0x80000001  : "AnimationBlock01",
     0x80000002  : "AnimationBlock02",
     0x80000000  : "ProbablyImportant",
-    #0x0000000C  : "ProbablyImportant",
     0x800001C0  : "TranslationBlock",
     0x80220040  : "TranslationX",
     0x80220080  : "TranslationY",
@@ -128,8 +127,23 @@ def read_ahi(data, path):
     
     read_offset += header_size
     
+    #create collection and empty
+    collection_name = f"{filename[:-4]}"
+    collection = bpy.data.collections.new(collection_name)
+    bpy.context.scene.collection.children.link(collection)
+    
+    obj_name = f"{filename[:-4]}_animations"
+    
+    target_obj = bpy.data.meshes.new(obj_name)
+    created_obj = bpy.data.objects.new(obj_name, target_obj)
+    collection.objects.link(created_obj)
+    
+    action_array = []
+    
     for a in range(animation_count):
         animation_name = f"{filename}_act_{a}"
+        action_array.append(animation_name)
+        
         bpy.data.actions.new(name=animation_name)
         current_action = bpy.data.actions[animation_name]
         
@@ -195,6 +209,8 @@ def read_ahi(data, path):
             else:
                 print(main_sector[0])
                 read_offset += main_sector[2]
+    
+    created_obj.data[f'actions'] = action_array
                 
 
 def read_some_data(context, filepath):
