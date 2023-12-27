@@ -31,6 +31,7 @@ sector_type_dict = {
     0x000A0000 : "AMO_vertex_UVs",
     0x000B0000 : "AMO_vertex_colors",       #GetVertexColorAMOModelMesh
     0x000C0000 : "AMO_vertex_groups",       #GetWeightAMOModelMesh
+    0x000E0000 : "AMO_unused_unknown",      #Never called by GetSubDataAMO, only present in st021
     0x000F0000 : "AMO_mesh_attributes",     #PlAMOGetModelAttributes
     0x00110000 : "AMO_hitbox_identifier",   #bounding model fetch, used for stages
     0x00000009 : "AMO_material_properties", #global
@@ -573,6 +574,10 @@ def amo_read(filedata, filepath, upflag):
                 elif main_sector[0] == "AMO_hitbox_identifier":
                     get_mesh_hit(filebuffer, read_offset+0xC, main_sector[1], mesh_hitbox_fetch)
                     read_offset += main_sector[2] #todo
+                
+                elif main_sector[0] == "AMO_unused_unknown":
+                    #completely unused sector, don't know the purpose, never called by GetSubDataAMO 
+                    read_offset += main_sector[2]
                 
             mesh_data = [
             mesh_indices,
