@@ -5,7 +5,7 @@ bl_info = {
     "name": "Artistoon Model Exporter",
     "description": "Exporter for the Artistoon Model Format (AMO) found in GioGio's Bizarre Adventure.",
     "author": "Penguino",
-    "version": (2, 1),
+    "version": (2, 0),
     "blender": (3, 6, 1),
     "location": "File > Export",
     "warning": "", # used for warning icon and text in addons panel
@@ -43,14 +43,15 @@ def pad_bytes(input_list, input_byte, size):
     #return pad
 
 
+
 def get_global_materials(collection):
     
-    def get_name(material):
+    def get_mat_name(material):
         return material.name
-
-    def get_index(texture):
-        return texture[0]
     
+    def get_tex_index(texture):
+        return texture[3]
+        
     matlist = []
     texlist = []
     
@@ -64,7 +65,7 @@ def get_global_materials(collection):
             for material in mesh.materials:
                 if material not in matlist:
                     matlist.append(material)               
-    matlist = sorted(matlist, key=get_name)
+    matlist = sorted(matlist, key=get_mat_name)
     
     if len(collection.keys()) != 0:
         for x in range(len(collection.keys())):
@@ -72,11 +73,11 @@ def get_global_materials(collection):
                 tex_property = collection[f'texture_{x}']
             except:
                 continue
-            texlist.append([tex_property[0], tex_property[1], tex_property[2]])
+            texlist.append([tex_property[0], tex_property[1], tex_property[2], x])
     else:
         return
     print(texlist)
-    texlist = sorted(texlist, key=get_index)
+    texlist = sorted(texlist, key=get_tex_index)
     
     for x in range(len(matlist)):
         material = matlist[x]
@@ -185,7 +186,7 @@ def get_indices(object, optimize_attempt):
         poly_verts = list(poly.vertices)
         mat = mesh.materials[poly.material_index].name
         if mat not in mat_list:
-                mat_list.append(mat)
+            mat_list.append(mat)
         
         if any(vert in complex_verts for vert in poly_verts):
             add_face(poly_verts, indices_04, materials_04)
