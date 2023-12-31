@@ -12,6 +12,9 @@ bl_info = {
     "category": "Export",
 }
 
+def int16_write(int):
+    return struct.pack('<H', int)
+
 def int32_write(int):
     return struct.pack('<I', int)
 
@@ -25,10 +28,13 @@ def int32_write_list(list):
     return tmpb
 
 def get_sector_size(array):
-    tmpb = (len(array)*4)+0x4
+    tmpb = 0x4
+    for fun in array:
+        ppp = fun.hex()
+        tmpb += int(len(ppp)/2)
     tmpb = int32_write(tmpb)
     return tmpb
-
+    
 def pad_bytes(input_list, input_byte, size):
     l = [input_byte] * (size//4)
     #pad = []
@@ -444,20 +450,16 @@ def get_bounding(object):
             if x.split('_')[0] == 'bounding':
                 bound.append(x)
         if len(bound) != 0:
-            for x in range(len(bound)//2):
+            for x in range(len(bound)):
                 unk1 = list(mesh.get(f'bounding_{x}_unk1'))
                 cull_range = list(mesh.get(f'culling_range'))
-                for unk in unk1:
-                    out.append(int16_write(unk))
+                for short in unk1:
+                    out.append(int16_write(short))   
                 for float in cull_range:
                     out.append(float_write(float))
-                #out.append(int16_write_list(unk1))
-                #out.append(float_write_list(unk2))
             out.insert(0, int32_write(0x00110000)) 
-            out.insert(1, int32_write(len(bound)//2))
+            out.insert(1, int32_write(len(bound)))
             out.insert(2, get_sector_size(out))
-            #for x in out:
-            #    out.append(x)
         return out
     else:
         return
