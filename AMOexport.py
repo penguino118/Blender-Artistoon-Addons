@@ -5,7 +5,7 @@ bl_info = {
     "name": "Artistoon Model Exporter",
     "description": "Exporter for the Artistoon Model Format (AMO) found in GioGio's Bizarre Adventure.",
     "author": "Penguino",
-    "version": (2, 0),
+    "version": (2, 1),
     "blender": (3, 6, 1),
     "location": "File > Export",
     "warning": "", # used for warning icon and text in addons panel
@@ -24,18 +24,6 @@ def int32_write_list(list):
         tmpb.append(struct.pack('<I', x))
     return tmpb
 
-def int16_write_list(list):
-    tmpb = []
-    for x in list:
-        tmpb.append(struct.pack('<H', x))
-    return tmpb
-
-def float_write_list(list):
-    tmpb = []
-    for x in list:
-        tmpb.append(struct.pack('<f', x))
-    return tmpb
-
 def get_sector_size(array):
     tmpb = (len(array)*4)+0x4
     tmpb = int32_write(tmpb)
@@ -48,10 +36,15 @@ def pad_bytes(input_list, input_byte, size):
         input_list.append(int32_write(v))
     #return pad
 
-def get_name(object):
-    return object.name
 
 def get_global_materials(collection):
+    
+    def get_name(material):
+        return material.name
+
+    def get_index(texture):
+        return texture[0]
+    
     matlist = []
     texlist = []
     
@@ -76,6 +69,8 @@ def get_global_materials(collection):
             texlist.append([tex_property[0], tex_property[1], tex_property[2]])
     else:
         return
+    print(texlist)
+    texlist = sorted(texlist, key=get_index)
     
     for x in range(len(matlist)):
         material = matlist[x]
@@ -442,7 +437,7 @@ def get_attributes(object):
 
 def get_bounding(object):
     mesh = object.data
-    out = ""
+    out = []
     if len(mesh.keys()) != 0:
         bound = []
         for x in mesh.keys():
@@ -451,9 +446,13 @@ def get_bounding(object):
         if len(bound) != 0:
             for x in range(len(bound)//2):
                 unk1 = list(mesh.get(f'bounding_{x}_unk1'))
-                unk2 = list(mesh.get(f'bounding_{x}_unk2'))
-                out.append(int16_write_list(unk1))
-                out.append(float_write_list(unk2))
+                cull_range = list(mesh.get(f'culling_range'))
+                for unk in unk1:
+                    out.append(int16_write(unk))
+                for float in cull_range:
+                    out.append(float_write(float))
+                #out.append(int16_write_list(unk1))
+                #out.append(float_write_list(unk2))
             out.insert(0, int32_write(0x00110000)) 
             out.insert(1, int32_write(len(bound)//2))
             out.insert(2, get_sector_size(out))
