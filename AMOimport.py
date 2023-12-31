@@ -454,7 +454,7 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
     
     for x in range(len(hitbox_fetch)):
         created_mesh.data[f'bounding_{x}_unk1'] = hitbox_fetch[x][0]
-        created_mesh.data[f'bounding_{x}_unk2'] = hitbox_fetch[x][1]
+        created_mesh.data[f'culling_range'] = hitbox_fetch[x][1]
     
     loop_normals = []
     for l in target_mesh.loops:
