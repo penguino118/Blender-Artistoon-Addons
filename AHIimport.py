@@ -126,12 +126,15 @@ def build_armature(collection, filename, bone_count, root_bones, bone_data, bone
         bone.matrix = bone_matrix[x]
         
         bpy.ops.object.mode_set(mode='OBJECT')
-        target_armature.bones.get(str(bone_name))['bone_type'] = bone_type  if bone_type  != 4294967295 else -1
-        target_armature.bones.get(str(bone_name))['bone_child'] = bone_child if bone_child != 4294967295 else -1
-        target_armature.bones.get(str(bone_name))['bone_unknown1'] = bone_unk1  if bone_unk1  != 4294967295 else -1
-        target_armature.bones.get(str(bone_name))['trans_inherit_mesh'] = bone_mesh  if bone_mesh  != 4294967295 else -1
-        target_armature.bones.get(str(bone_name))['bone_scale'] = bone_scale
-        
+        try:
+            target_armature.bones.get(str(bone_name))['bone_type'] = bone_type  if bone_type  != 4294967295 else -1
+            target_armature.bones.get(str(bone_name))['bone_child'] = bone_child if bone_child != 4294967295 else -1
+            target_armature.bones.get(str(bone_name))['bone_unknown1'] = bone_unk1  if bone_unk1  != 4294967295 else -1
+            target_armature.bones.get(str(bone_name))['trans_inherit_mesh'] = bone_mesh  if bone_mesh  != 4294967295 else -1
+            target_armature.bones.get(str(bone_name))['bone_scale'] = bone_scale
+        except:
+            continue
+            
 
 def read_AHI(filedata, filepath, z_up):
     filebuffer = filedata
