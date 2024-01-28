@@ -166,5 +166,5 @@ def unregister():
     for art_class in classes:
         bpy.utils.unregister_class(art_class)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
-    bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
+    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
 
