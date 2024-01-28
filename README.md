@@ -1,5 +1,5 @@
 # Blender Artistoon Addons
-Blender scripts to manage model files from the Artistoon engine. Only tested with [**GioGio's Bizarre Adventure (PS2)**](https://jojowiki.com/GioGio%27s_Bizarre_Adventure).<br>
+Blender addon that helps handle assets from the Artistoon engine. Designed to be used with [**GioGio's Bizarre Adventure (PS2)**](https://jojowiki.com/GioGio%27s_Bizarre_Adventure) files.<br>
 
 ## Model Importer (AMO)
 ### To-do
