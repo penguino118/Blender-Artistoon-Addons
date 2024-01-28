@@ -1,41 +1,8 @@
 import bpy
-import struct
 import os 
+from ..sector_handler import AAN_sector_dict as sector_type_dict
+from ..binary_rw import int08_read, int16_read, int16_read_signed, int32_read, float_read
 
-sector_type_dict = {
-    0x80000001  : "AnimationBlock01",
-    0x80000002  : "AnimationBlock02",
-    0x80000000  : "ProbablyImportant",
-    0x800001C0  : "TranslationBlock",
-    0x80220040  : "TranslationX",
-    0x80220080  : "TranslationY",
-    0x80220100  : "TranslationZ",
-    0x80120040  : "TransShortX",
-    0x80120080  : "TransShortY",
-    0x80120100  : "TransShortZ",
-    0x80000038  : "RotationBlock",
-    0x80220008  : "RotationX",
-    0x80220010  : "RotationY",
-    0x80220020  : "RotationZ",
-    0x80120008  : "RotaShortX",
-    0x80120010  : "RotaShortY",
-    0x80120020  : "RotaShortZ",
-    }
-    
-def int08_read(buf, offset):
-    return struct.unpack("<B", buf[offset:offset+1])[0]
-
-def int16_read(buf, offset):
-    return struct.unpack("<H", buf[offset:offset+2])[0]
-
-def signed_int16_read(buf, offset):
-    return struct.unpack("<h", buf[offset:offset+2])[0]
-
-def int32_read(buf, offset):
-    return struct.unpack("<I", buf[offset:offset+4])[0]
-
-def float_read(buf, offset):
-    return struct.unpack("<f", buf[offset:offset+4])[0]
 
 def get_sector_type(buffer, offset):
     head = int32_read(buffer, offset)
@@ -66,10 +33,10 @@ def get_keyframe(buffer, offset, type, action):
             action.frame_end = frame
         return [value, frame, ease_in, ease_out]
     elif type == 2:
-        value    = float(signed_int16_read(buffer, offset) / 2607.5946)    
-        frame    = signed_int16_read(buffer, offset+0x2)
-        ease_in  = float(signed_int16_read(buffer, offset+0x4) / 2607.5946)
-        ease_out = float(signed_int16_read(buffer, offset+0x6) / 2607.5946)
+        value    = float(int16_read_signed(buffer, offset) / 2607.5946)    
+        frame    = int16_read_signed(buffer, offset+0x2)
+        ease_in  = float(int16_read_signed(buffer, offset+0x4) / 2607.5946)
+        ease_out = float(int16_read_signed(buffer, offset+0x6) / 2607.5946)
         if frame > action.frame_end:
             action.frame_end = frame
         return [value, frame, ease_in, ease_out]
@@ -83,7 +50,6 @@ def set_dummy_keyframe(armature, anim_name, anim_index, index):
     bone.keyframe_insert('location', index=1, frame=-1.234)
     bone.keyframe_insert('location', index=2, frame=-1.234)
     
-
 def set_keyframe(armature, anim_name, type, anim_index, axis, index, keyframe_list):
     if not armature.animation_data:
         armature.animation_data_create()
@@ -105,8 +71,7 @@ def set_keyframe(armature, anim_name, type, anim_index, axis, index, keyframe_li
             bone.rotation_euler[axis] = anim_value# * (57.33/2)
             bone.keyframe_insert('rotation_euler', index=axis, frame=anim_frame)
 
-
-def read_ahi(data, path):
+def read_aan(data, path):
     filebuffer = data
     filename = os.path.basename(path)
     
@@ -212,78 +177,10 @@ def read_ahi(data, path):
     
     created_obj.data[f'actions'] = action_array
                 
-
-def read_some_data(context, filepath):
+def read(context, filepath):
     print("running read_some_data...")
     f = open(filepath, 'rb')
     data = f.read()
     f.close()
-
-    read_ahi(data, filepath)
-
+    read_aan(data, filepath)
     return {'FINISHED'}
-
-# ImportHelper is a helper class, defines filename and
-# invoke() function which calls the file selector.
-from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, BoolProperty, EnumProperty
-from bpy.types import Operator
-
-
-class Import_AAN(Operator, ImportHelper):
-    """Import Artistoon Animation data to the currently selected armature."""
-    bl_idname = "import_scene.aan"  # important since its how bpy.ops.import_test.some_data is constructed
-    bl_label = "Import Artistoon Animation"
-
-    # ImportHelper mixin class uses this
-    filename_ext = ".aan/.bin"
-
-    filter_glob: StringProperty(
-        default="*.aan;*.bin",
-        options={'HIDDEN'},
-        maxlen=255,  # Max internal buffer length, longer would be clamped.
-    )
-
-    # List of operator properties, the attributes will be assigned
-    # to the class instance from the operator settings before calling.
-#    use_setting: BoolProperty(
-#        name="Example Boolean",
-#        description="Example Tooltip",
-#        default=True,
-#    )
-
-#    type: EnumProperty(
-#        name="Example Enum",
-#        description="Choose between two items",
-#        items=(
-#            ('OPT_A', "First Option", "Description one"),
-#            ('OPT_B', "Second Option", "Description two"),
-#        ),
-#        default='OPT_A',
-#    )
-
-    def execute(self, context):
-        return read_some_data(context, self.filepath)
-
-
-# Only needed if you want to add into a dynamic menu.
-def menu_func_import(self, context):
-    self.layout.operator(Import_AAN.bl_idname, text="Artistoon Animation (.aan | .bin)")
-
-
-# Register and add to the "file selector" menu (required to use F3 search "Text Import Operator" for quick access).
-def register():
-    bpy.utils.register_class(Import_AAN)
-    bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
-
-
-def unregister():
-    bpy.utils.unregister_class(Import_AAN)
-    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
-
-
-if __name__ == "__main__":
-    register()
-
-    # test call
-    bpy.ops.import_scene.aan('INVOKE_DEFAULT')

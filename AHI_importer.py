@@ -3,40 +3,31 @@ import array
 import os
 import mathutils
 import math
-import struct
+#import struct
+from ..sector_handler import AHI_sector_dict as sector_type_dict
+from ..binary_rw import int16_read, int32_read, float_read
 
-bl_info = {
-    "name": "Artistoon Armature Importer",
-    "description": "Importer for the Artistoon Armature Format (AHI) found in GioGio's Bizarre Adventure.",
-    "author": "Penguino",
-    "version": (1, 0),
-    "blender": (3, 6, 1),
-    "location": "File > Import",
-    "warning": "", # used for warning icon and text in addons panel
-    "category": "Import",
-}
-
-sector_type_dict = {
-    0xC0000000  : "AHI_magic",       #start of the file #count is global sector count
-    0x00000000  : "AHI_tree_root",   #tree root model number (??)
-    0x40000001  : "AHI_bone_type_1", #bone type 1
-    0x40000002  : "AHI_bone_type_2", #bone type 1
-    }
+# sector_type_dict = {
+    # 0xC0000000  : "AHI_magic",       #start of the file #count is global sector count
+    # 0x00000000  : "AHI_tree_root",   #tree root model number (??)
+    # 0x40000001  : "AHI_bone_type_1", #bone type 1
+    # 0x40000002  : "AHI_bone_type_2", #bone type 1
+    # }
     
-def read_file(filepath):
-    f = open(filepath, 'rb')
-    data = f.read()
-    f.close()
-    return data
+# def read_file(filepath):
+    # f = open(filepath, 'rb')
+    # data = f.read()
+    # f.close()
+    # return data
 
-def int16_read(buf, offset):
-    return struct.unpack("<H", buf[offset:offset+2])[0]
+# def int16_read(buf, offset):
+    # return struct.unpack("<H", buf[offset:offset+2])[0]
 
-def int32_read(buf, offset):
-    return struct.unpack("<I", buf[offset:offset+4])[0]
+# def int32_read(buf, offset):
+    # return struct.unpack("<I", buf[offset:offset+4])[0]
 
-def float_read(buf, offset):
-    return struct.unpack("<f", buf[offset:offset+4])[0]
+# def float_read(buf, offset):
+    # return struct.unpack("<f", buf[offset:offset+4])[0]
 
 def get_sector_type(buffer, offset):
     head = int32_read(buffer, offset)
@@ -176,7 +167,7 @@ def read_AHI(filedata, filepath, z_up):
         
         build_armature(collection, filename, bone_count, root_bones, bone_data, bone_matrix, z_up)
 
-def read_some_data(context, filepath, z_up):
+def read(context, filepath, z_up):
     print("running read_some_data...")
     f = open(filepath, 'rb')
     data = f.read()
@@ -185,75 +176,3 @@ def read_some_data(context, filepath, z_up):
     read_AHI(data, filepath, z_up)
     
     return {'FINISHED'}
-
-
-# ImportHelper is a helper class, defines filename and
-# invoke() function which calls the file selector.
-from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, BoolProperty, EnumProperty
-from bpy.types import Operator
-
-
-class Import_AHI(Operator, ImportHelper):
-    """Import Artistoon Armature data into a new collection."""
-    bl_idname = "import_scene.ahi"  # important since its how bpy.ops.import_test.some_data is constructed
-    bl_label = "Import Artistoon Armature"
-
-    # ImportHelper mixin class uses this
-    filename_ext = ".ahi"
-
-    filter_glob: StringProperty(
-        default="*.ahi",
-        options={'HIDDEN'},
-        maxlen=255,  # Max internal buffer length, longer would be clamped.
-    )
-
-    # List of operator properties, the attributes will be assigned
-    # to the class instance from the operator settings before calling.
-#    use_setting: BoolProperty(
-#        name="Example Boolean",
-#        description="Example Tooltip",
-#        default=True,
-#    )
-
-#    type: EnumProperty(
-#        name="Example Enum",
-#        description="Choose between two items",
-#        items=(
-#            ('OPT_A', "First Option", "Description one"),
-#            ('OPT_B', "Second Option", "Description two"),
-#        ),
-#        default='OPT_A',
-#    )
-
-    z_up: BoolProperty(
-        name="Rotate Z to up",
-        description="Rotates the object so it faces up in the Z axis.",
-        default=True,
-    )
-
-    def execute(self, context):
-        return read_some_data(context, self.filepath, self.z_up)
-
-
-# Only needed if you want to add into a dynamic menu.
-def menu_func_import(self, context):
-    self.layout.operator(Import_AHI.bl_idname, text="Artistoon Armature (.ahi)")
-
-
-# Register and add to the "file selector" menu (required to use F3 search "Text Import Operator" for quick access).
-def register():
-    bpy.utils.register_class(Import_AHI)
-    bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
-
-
-def unregister():
-    bpy.utils.unregister_class(Import_AHI)
-    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
-
-
-if __name__ == "__main__":
-    register()
-
-    # test call
-    bpy.ops.import_scene.ahi('INVOKE_DEFAULT')

@@ -1,58 +1,18 @@
 import bpy
 import os
-import struct
 import bmesh
 import math
 import mathutils
+from ..sector_handler import AMO_sector_dict as sector_type_dict
+from ..binary_rw import int16_read, int32_read, float_read
 
-bl_info = {
-    "name": "Artistoon Model Importer",
-    "description": "Importer for the Artistoon Model Format (AMO) found in GioGio's Bizarre Adventure.",
-    "author": "Penguino",
-    "version": (1, 0),
-    "blender": (3, 6, 1),
-    "location": "File > Import",
-    "warning": "", # used for warning icon and text in addons panel
-    "category": "Import",
-}
 
-sector_type_dict = {
-    0x00000001 : "AMO_magic",
-    0x00020000 : "AMO_unknown",             #something about RAM?
-    0x00000002 : "AMO_model_container",     #game func: GetModelNum
-    0x00000004 : "AMO_mesh_container",
-    0x00000005 : "AMO_tristrip_container",  #GetIndexListAMOModelMesh
-    0x00030000 : "AMO_tristrip_03_data",
-    0x00040000 : "AMO_tristrip_04_data",    #triangles with multiple bone deformations
-    0x00050000 : "AMO_material_list",       #per mesh material
-    0x00060000 : "AMO_material_per_strip",
-    0x00070000 : "AMO_vertex_coordinates",  #GetVertexAMOModelMesh
-    0x00080000 : "AMO_vertex_normals",      #GetNormalAMOModelMesh
-    0x000A0000 : "AMO_vertex_UVs",
-    0x000B0000 : "AMO_vertex_colors",       #GetVertexColorAMOModelMesh
-    0x000C0000 : "AMO_vertex_groups",       #GetWeightAMOModelMesh
-    0x000E0000 : "AMO_unused_unknown",      #Never called by GetSubDataAMO, only present in st021
-    0x000F0000 : "AMO_mesh_attributes",     #PlAMOGetModelAttributes
-    0x00110000 : "AMO_hitbox_identifier",   #bounding model fetch, used for stages
-    0x00000009 : "AMO_material_properties", #global
-    0x0000000A : "AMO_texture_properties"
-    }
-
-model_type_dict = { #######where are materials 2 and 4 ?????
+model_type_dict = { # where are materials 2 and 4 ? Also this doesnt really matter that much ingame huh Lol.
     0x00000000 : "VFX",       #eff00.pzz meshes
     0x00000001 : "CelShaded",
     0x00000003 : "Shadeless", #used on transparent meshes
     0x00000005 : "Static"     #loading screens, stage objects, etc
     }
-
-def int16_read(buf, offset):
-    return struct.unpack("<H", buf[offset:offset+2])[0]
-
-def int32_read(buf, offset):
-    return struct.unpack("<I", buf[offset:offset+4])[0]
-
-def float_read(buf, offset):
-    return struct.unpack("<f", buf[offset:offset+4])[0]
 
 def get_sector_type(buffer, offset):
     head = int32_read(buffer, offset)
@@ -328,17 +288,17 @@ def get_mesh_attributes(buffer, offset, sector_size, list):
     offset -= 0xC
     
     attribute_offsets = [
-    0x0C, #max render distance
-    0x10, #aa_material (dunno what it do lol)
+    0x0C, #max render distance (unused?)
+    0x10, #aa_material (dunno)
     0x14, 
-    0x18, #aa_cull (dunno what it do lol)
+    0x18, #aa_cull (unused?)
     0x1C, #aa_scissor (bool for oclussion culling)
     0x20, #aa_light (set to 2 in transparent meshes)
     0x24, 
     0x28, #aa_uvscroll (...for main menu clouds?)
     0x2C, 
-    0x30, #aa_fadecolor (dunno what it do lol) 
-    0x34, #aa_special (dunno what it do lol) 
+    0x30, #aa_fadecolor (dunno) 
+    0x34, #aa_special (dunno) 
     0x38, 
     0x3C, 
     0x40, 
@@ -595,69 +555,10 @@ def amo_read(filedata, filepath, upflag):
             build_mesh(collection, model_index, filename, mesh_data, tmp_strip_length, upflag)
 
 
-def read_some_data(context, filepath, upflag): #, use_some_setting
+def read(context, filepath, upflag): #, use_some_setting
     print("running read_some_data...")
     f = open(filepath, 'rb')
     data = f.read()
     f.close()
-
-    # would normally load the data here
     amo_read(data, filepath, upflag)
-
     return {'FINISHED'}
-
-
-# ImportHelper is a helper class, defines filename and
-# invoke() function which calls the file selector.
-from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty, BoolProperty, EnumProperty
-from bpy.types import Operator
-
-
-class Import_AMO(Operator, ImportHelper):
-    """Import Artistoon Model data as a new collection."""
-    bl_idname = "import_scene.amo"  # important since its how bpy.ops.import_test.some_data is constructed
-    bl_label = "Import Artistoon Model"
-
-    # ImportHelper mixin class uses this
-    filename_ext = ".amo"
-
-    filter_glob: StringProperty(
-        default="*.amo",
-        options={'HIDDEN'},
-        maxlen=255,  # Max internal buffer length, longer would be clamped.
-    )
-
-    # List of operator properties, the attributes will be assigned
-    # to the class instance from the operator settings before calling.
-    z_up: BoolProperty(
-        name="Rotate Z to up",
-        description="Rotates the objects so the meshes face up in the Z axis.",
-        default=True,
-    )
-    
-    def execute(self, context):
-        return read_some_data(context, self.filepath, self.z_up) # self.use_setting
-
-
-# Only needed if you want to add into a dynamic menu.
-def menu_func_import(self, context):
-    self.layout.operator(Import_AMO.bl_idname, text="Artistoon Model (.amo)")
-
-
-# Register and add to the "file selector" menu (required to use F3 search "Text Import Operator" for quick access).
-def register():
-    bpy.utils.register_class(Import_AMO)
-    bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
-
-
-def unregister():
-    bpy.utils.unregister_class(Import_AMO)
-    bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
-
-
-if __name__ == "__main__":
-    register()
-
-    # test call
-    bpy.ops.import_scene.amo('INVOKE_DEFAULT')

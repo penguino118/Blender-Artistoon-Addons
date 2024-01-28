@@ -1,197 +1,99 @@
 import bpy
-import struct
+import math
+import mathutils
+from ..binary_rw import int16_write, int32_write, int32_write_signed, float_write, int32_write_list, pad_bytes
+from ..sector_handler import get_sector_size
 
-bl_info = {
-    "name": "Artistoon Armature Exporter",
-    "description": "Exporter for the Artistoon Armature Format (AHI) found in GioGio's Bizarre Adventure.",
-    "author": "Penguino",
-    "version": (1, 0),
-    "blender": (3, 6, 1),
-    "location": "File > Export",
-    "warning": "", # used for warning icon and text in addons panel
-    "category": "Export",
-}
 
-def write_int32(int):
-    tmp = f"{struct.unpack('>I', struct.pack('<I', int))[0]:08X}"
-    return tmp
+def handle_parent(bone_list, bone_parent): #incase it's none
+    if bone_parent is not None:
+        return bone_list.index(bone_parent)
+    else:
+        return -1
 
-def write_float(float):
-    tmp = f"{struct.unpack('>I', struct.pack('<f', float))[0]:08X}"
-    return tmp
-    
-def batch_write_int32(list):
-    tmp = ""
-    for x in list:
-        tmp += f"{struct.unpack('>I', struct.pack('<I', x))[0]:08X} "
-    return tmp
-
-def batch_write_float(list):
-    tmp = ""
-    for x in list:
-        tmp += f"{struct.unpack('>I', struct.pack('<f', x))[0]:08X} "
-    return tmp
-
-def get_sector_size(array):
-    tmp = len(bytes.fromhex(f"{intb(1)} {intb(1)} {intb(1)} {array}"))
-    tmp = intb(tmp)
-    return tmp
-
-def pad_bytes(length):
-    l = [0] * (length//4)
-    pad = ""
-    for v in l:
-        pad += (f"{write_int32(v)}")
-    return pad
+def to_vector(shit):
+    return mathutils.Vector((shit[0], shit[1], shit[2]))
 
 def get_ahi():
     object = bpy.context.active_object
     if object.type == 'ARMATURE':
-        finalbytes = ""
-        bone_sector = ""
+        finalbytes = []
+        root_sector = []
+        bone_sector = []
+        
         bones = object.data.bones
         bone_count = len(object.data.bones)
         root_bones = object.get('root_bones')
-        #if root_bones == None:
-        #    return
-        
-        root_data = f"{write_int32(0x00000000)} {write_int32(len(root_bones))} {write_int32((len(root_bones) * 4) + 0xC)}"
-        for x in range(len(root_bones)):
-            root_data += f"{write_int32(root_bones[x])} "
+        bone_list = list(bones)
 
-        full_size = (bone_count*0x10C) + len(bytes.fromhex(root_data)) + 0xC
-        header_data = f"{write_int32(0xC0000000)} {write_int32(bone_count+1)} {write_int32(full_size)} "
+        root_sector.append(int32_write(0x00000000))
+        root_sector.append(int32_write(len(root_bones)))
+        root_sector.append(int32_write((len(root_bones) * 4) + 0xC))
         
+        for bone in root_bones:
+            root_sector.append(int32_write(bone))
+
         for bone in bones:
-            #bone = object.data.bones[str(x)]
-            bone_parent = bone.parent
-            bone_child = bone.get('bone_child')
-            bone_unknown1 = bone.get('bone_unknown1')
-            trans_inherit = bone.get('trans_inherit_mesh')
-            bone_type = bone.get('bone_type')
+            boneID = int32_write(bone_list.index(bone))
+            bone_parent = int32_write_signed(handle_parent(bone_list, bone.parent))
+            bone_child =    int32_write_signed(bone.get('bone_child'))
+            bone_unknown1 = int32_write_signed(bone.get('bone_unknown1'))
+            trans_inherit = int32_write_signed(bone.get('trans_inherit_mesh'))
+            bone_type =     int32_write(bone.get('bone_type') + 0x40000000)
             bone_scale = bone.get('bone_scale')
         
             loc, rot, sca = bone.matrix_local.decompose()
-            rot = rot.to_euler('XYZ')
-            
-            print(loc)
-            
-            if bone_parent == None:
-                bone_parent = f"FFFFFFFF"
-            else:
-                bone_parent = f"{write_int32(int(bone_parent.name))}"
-                parent_loc, parent_rot, parent_sca = bone.parent.matrix_local.decompose()
-                parent_rot = parent_rot.to_euler('XYZ')
-                
-                loc -= parent_loc
-                rot == (rot[0] -  parent_rot[0], rot[1] - parent_rot[1], rot[2] - parent_rot[2] )
-                sca -= parent_sca
-                                
-            if bone_child == -1:
-                bone_child = f"FFFFFFFF"
-            else:
-                bone_child = f"{write_int32(bone_child)}"
-            if bone_unknown1 == -1:
-                bone_unknown1 = f"FFFFFFFF"
-            else:
-                bone_unknown1 = f"{write_int32(bone_unknown1)}"
-            if trans_inherit == -1:
-                trans_inherit = f"FFFFFFFF"
-            else:
-                trans_inherit = f"{write_int32(trans_inherit)}"
-            
-            if bone_type == 1:
-                bone_type = f"01000040"
-            elif bone_type == 2:
-                bone_type = f"02000040"
-            
-            position = f"{write_float(loc[0])} {write_float(loc[1])} {write_float(loc[2])} {write_float(1.0)}"
-            rotation = f"{write_float(rot[0])} {write_float(rot[1])} {write_float(rot[2])} {write_float(1.0)}"
-            scale = f"{write_float(bone_scale[0])} {write_float(bone_scale[1])} {write_float(bone_scale[2])} {write_float(bone_scale[3])}"
-            
-            boneID = f"{write_int32(int(bone.name))}"
-            
-            data = f"{bone_type} {write_int32(1)} {write_int32(0x10C)} "
-            data += f"{boneID} {bone_parent} {bone_child} {bone_unknown1} "
-            data += f"{scale} {rotation} {position} {trans_inherit} "
-            data += f"{pad_bytes(0xBC)} "
-            bone_sector += data
-            
-            finalbytes = f"{header_data} {root_data} {bone_sector}"
-            
-        return bytes.fromhex(finalbytes)
+            rot = to_vector(rot.to_euler('XYZ')) #[mathutils.Vector (val) for val in rot.to_euler('XYZ')] # list(rot.to_euler('XYZ'))
 
-def write_some_data(context, filepath):
-    print("running write_some_data...")
+            if bone.parent != None:
+                parent_loc, parent_rot, parent_sca = bone.parent.matrix_local.decompose()
+                parent_rot = to_vector(parent_rot.to_euler('XYZ'))
+                loc -= parent_loc
+                rot -= parent_rot
+                sca -= parent_sca
+
+            transform = []
+            transform.append(float_write(bone_scale[0])) #scale 
+            transform.append(float_write(bone_scale[1])) 
+            transform.append(float_write(bone_scale[2]))
+            transform.append(float_write(bone_scale[3])) 
+            
+            transform.append(float_write(rot[0])) # rotation
+            transform.append(float_write(rot[1]))
+            transform.append(float_write(rot[2]))
+            transform.append(float_write(1.0))
+            
+            transform.append(float_write(loc[0])) # position
+            transform.append(float_write(loc[1]))
+            transform.append(float_write(loc[2]))
+            transform.append(float_write(1.0))
+            
+            # writing #
+            
+            bone_sector.append(bone_type) # bone miniheader
+            bone_sector.append(int32_write(1))
+            bone_sector.append(int32_write(0x10C)) # same size always expected
+            
+            bone_sector.append(boneID)
+            bone_sector.append(bone_parent)
+            bone_sector.append(bone_child)
+            bone_sector.append(bone_unknown1)
+            for float in transform: bone_sector.append(float)
+            bone_sector.append(trans_inherit)
+            pad_bytes(bone_sector, 0x00, 0xBC)
+
+        for thing in root_sector: finalbytes.append(thing)
+        for thing in bone_sector: finalbytes.append(thing)
+        finalbytes.insert(0, int32_write(0xC0000000)) #finalheader
+        finalbytes.insert(1, int32_write(bone_count+1))
+        finalbytes.insert(2, get_sector_size(finalbytes))   
+        return finalbytes
+
+def write(context, filepath):
+    print("Exporting Artistoon Armature...")
     ahi = get_ahi()
     f = open(filepath, 'wb')
-    f.write(ahi)
+    for byte in ahi:
+        f.write(byte)
     f.close()
-
     return {'FINISHED'}
-
-
-# ExportHelper is a helper class, defines filename and
-# invoke() function which calls the file selector.
-from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty, BoolProperty, EnumProperty
-from bpy.types import Operator
-
-
-class Export_AHI(Operator, ExportHelper):
-    """Export selected armature object as Artistoon Armature data."""
-    bl_idname = "export_scene.ahi"  # important since its how bpy.ops.import_test.some_data is constructed
-    bl_label = "Export Artistoon Armature"
-
-    # ExportHelper mixin class uses this
-    filename_ext = ".ahi"
-
-    filter_glob: StringProperty(
-        default="*.ahi",
-        options={'HIDDEN'},
-        maxlen=255,  # Max internal buffer length, longer would be clamped.
-    )
-
-    # List of operator properties, the attributes will be assigned
-    # to the class instance from the operator settings before calling.
-#    use_setting: BoolProperty(
-#        name="Example Boolean",
-#        description="Example Tooltip",
-#        default=True,
-#    )
-
-#    type: EnumProperty(
-#        name="Example Enum",
-#        description="Choose between two items",
-#        items=(
-#            ('OPT_A', "First Option", "Description one"),
-#            ('OPT_B', "Second Option", "Description two"),
-#        ),
-#        default='OPT_A',
-#    )
-
-    def execute(self, context):
-        return write_some_data(context, self.filepath)
-
-
-# Only needed if you want to add into a dynamic menu
-def menu_func_export(self, context):
-    self.layout.operator(Export_AHI.bl_idname, text="Artistoon Armature (.ahi)")
-
-
-# Register and add to the "file selector" menu (required to use F3 search "Text Export Operator" for quick access).
-def register():
-    bpy.utils.register_class(Export_AHI)
-    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
-
-
-def unregister():
-    bpy.utils.unregister_class(Export_AHI)
-    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
-
-
-if __name__ == "__main__":
-    register()
-
-    # test call
-    bpy.ops.export_scene.ahi('INVOKE_DEFAULT')

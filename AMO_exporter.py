@@ -1,47 +1,6 @@
 import bpy
-import struct
-
-bl_info = {
-    "name": "Artistoon Model Exporter",
-    "description": "Exporter for the Artistoon Model Format (AMO) found in GioGio's Bizarre Adventure.",
-    "author": "Penguino",
-    "version": (2, 0),
-    "blender": (3, 6, 1),
-    "location": "File > Export",
-    "warning": "", # used for warning icon and text in addons panel
-    "category": "Export",
-}
-
-def int16_write(int):
-    return struct.pack('<H', int)
-
-def int32_write(int):
-    return struct.pack('<I', int)
-
-def float_write(float):
-    return struct.pack('<f', float)
-    
-def int32_write_list(list):
-    tmpb = []
-    for x in list:
-        tmpb.append(struct.pack('<I', x))
-    return tmpb
-
-def get_sector_size(array):
-    tmpb = 0x4
-    for fun in array:
-        ppp = fun.hex()
-        tmpb += int(len(ppp)/2)
-    tmpb = int32_write(tmpb)
-    return tmpb
-    
-def pad_bytes(input_list, input_byte, size):
-    l = [input_byte] * (size//4)
-    #pad = []
-    for v in l:
-        input_list.append(int32_write(v))
-    #return pad
-
+from ..binary_rw import int16_write, int32_write, float_write, int32_write_list, pad_bytes
+from ..sector_handler import get_sector_size
 
 
 def get_global_materials(collection):
@@ -548,79 +507,12 @@ def get_amo(optimize):
         
     return mesh_out
 
-
-def write_some_data(context, filepath, optimize_attempt):
-    print("running write_some_data...")
+def write(context, filepath, optimize_attempt):
+    print("Exporting Artistoon Model...")
     amo = get_amo(optimize_attempt)
     f = open(filepath, 'wb')
     for byte in amo:
         #print(byte.hex())
         f.write(byte)
     f.close()
-
     return {'FINISHED'}
-
-# ExportHelper is a helper class, defines filename and
-# invoke() function which calls the file selector.
-from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty, BoolProperty, EnumProperty
-from bpy.types import Operator
-
-
-class Export_AMO(Operator, ExportHelper):
-    """Export selected collection as Artistoon Model data."""
-    bl_idname = "export_scene.amo"  # important since its how bpy.ops.import_test.some_data is constructed
-    bl_label = "Export Artistoon Model"
-
-    # ExportHelper mixin class uses this
-    filename_ext = ".amo"
-
-    filter_glob: StringProperty(
-        default="*.amo",
-        options={'HIDDEN'},
-        maxlen=255,  # Max internal buffer length, longer would be clamped.
-    )
-
-    # List of operator properties, the attributes will be assigned
-    # to the class instance from the operator settings before calling.
-    optimize_attempt: BoolProperty(
-        name="Optimize Meshes",
-        description="Attempts optimize meshes by joining neighbour triangles into triangle strips.",
-        default=False,
-    )
-
-#    type: EnumProperty(
-#        name="Example Enum",
-#        description="Choose between two items",
-#        items=(
-#            ('OPT_A', "First Option", "Description one"),
-#            ('OPT_B', "Second Option", "Description two"),
-#        ),
-#        default='OPT_A',
-#    )
-
-    def execute(self, context):
-        return write_some_data(context, self.filepath, self.optimize_attempt)
-
-
-# Only needed if you want to add into a dynamic menu
-def menu_func_export(self, context):
-    self.layout.operator(Export_AMO.bl_idname, text="Artistoon Model (.amo)")
-
-
-# Register and add to the "file selector" menu (required to use F3 search "Text Export Operator" for quick access).
-def register():
-    bpy.utils.register_class(Export_AMO)
-    bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
-
-
-def unregister():
-    bpy.utils.unregister_class(Export_AMO)
-    bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
-
-
-if __name__ == "__main__":
-    register()
-
-    # test call
-    bpy.ops.export_scene.amo('INVOKE_DEFAULT')
