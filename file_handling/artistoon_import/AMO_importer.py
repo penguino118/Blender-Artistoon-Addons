@@ -420,7 +420,6 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
     for l in target_mesh.loops:
         loop_normals.append(vertnormals[l.vertex_index])
     target_mesh.normals_split_custom_set(loop_normals)
-    target_mesh.use_auto_smooth = True
 
     col_attribute = created_mesh.data.color_attributes.new(
     name="vertex_color",

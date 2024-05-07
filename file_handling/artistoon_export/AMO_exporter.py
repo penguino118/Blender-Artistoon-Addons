@@ -35,7 +35,7 @@ def get_global_materials(collection):
             texlist.append([tex_property[0], tex_property[1], tex_property[2], x])
     else:
         return
-    print(texlist)
+
     texlist = sorted(texlist, key=get_tex_index)
     
     for x in range(len(matlist)):
@@ -435,7 +435,6 @@ def get_amo(optimize):
         if object.type == 'MESH':
             out = []
             object.data.calc_loop_triangles()
-            object.data.calc_normals_split()
             
             mesh_indices   = get_indices(object, optimize)
             vertex_coords  = get_vert_coord(object)
@@ -445,9 +444,7 @@ def get_amo(optimize):
             vertex_groups  = get_vert_group(object)
             attributes     = get_attributes(object)
             bounding       = get_bounding(object)
-            
-            object.data.free_normals_split()
-            
+          
             sector_count = 0
             if len(mesh_indices) != 0:
                 sector_count += 3
