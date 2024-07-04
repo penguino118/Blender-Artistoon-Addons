@@ -1,7 +1,8 @@
 import bpy
+import bmesh
 from ..binary_rw import int16_write, int32_write, float_write, int32_write_list, pad_bytes
 from ..sector_handler import get_sector_size
-
+from ...pyffi.utils import tristrip
 
 def get_global_materials(collection):
     
@@ -97,168 +98,123 @@ def get_global_materials(collection):
         out.append(x)
     return out
 
-def get_indices(object, optimize_attempt):
+def get_indices(object, face_type):
     
-    out = []
-    mesh = object.data
-    
-    def add_indices(list, out):
+    def triangulate(mesh):
+        bm = bmesh.new()
+        bm.from_mesh(mesh)
+        bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='LONG_EDGE')
+        bm.to_mesh(mesh)
+        bm.free()
+
+    def write_indices(list, out):
         for poly in list:
             size = len(poly)
             out.append(int32_write(size))
             for vert in poly:
                 out.append(int32_write(vert))
-            #out.insert(0, int32_write(size))
-    
-    def add_materials(facemats, matlist, out):
+
+    def write_materials(facemats, matlist, out):
         for face_mat in facemats:
             for mat in mat_list:
                 if face_mat == mat:
                     out.append(int32_write(mat_list.index(mat)))
+
+    def add_face(split_faces, material_name, poly_verts):
+        if material_name in split_faces:
+            split_faces[material_name].append(poly_verts)
+        else:
+            split_faces[material_name] = [poly_verts]
     
-    def add_face(poly_verts, index_list, material_list):
-        if len(poly_verts) == 4: #quads
-            poly_verts = [poly_verts[2], poly_verts[3], poly_verts[1], poly_verts[0]]
-        index_list.append(poly_verts)
-        material_list.append(mat)
+    def collect_indices(faces, face_type):
+        collected_indices = []
+        collected_materials = []
+        for material, indices in faces: #split_03_faces.items()
+            print(indices)
+            if face_type == 'TRI_STRIP': indices = tristrip.stripify(indices)
+            for index in indices:
+                collected_indices.append(index)
+                collected_materials.append(material)
+        return collected_indices, collected_materials
+        
+    mesh = object.to_mesh(preserve_all_data_layers=True)
+    triangulate(mesh)
     
+    out_bytes = []
     complex_verts = []
-    indices_03 = []
-    indices_04 = []
     mat_list = []
-    
-    
+
+    # giogio stores faces with two or more weight groups on a separate list (04 instead of 03)
     for vert in mesh.vertices: #gather indices for type 04 list
-        vert_group = []
-        for groupss in vert.groups:
-            group_name = object.vertex_groups[groupss.group].name
-            group_weight = groupss.weight
-            vert_group.append([group_name, group_weight])
-        if len(vert_group) > 1:
+        current_vertex_group = []
+        for vert_groups in vert.groups:
+            group_name = object.vertex_groups[vert_groups.group].name
+            group_weight = vert_groups.weight
+            current_vertex_group.append([group_name, group_weight])
+        if len(current_vertex_group) > 1: #if more than one group on this vertex add to 04 verts list
             complex_verts.append(vert.index)
 
-    materials_03 = []
-    materials_04 = []
-    
+    split_03_faces = {} # 03 faces split by material
+    split_04_faces = {} # 04 faces split by material
+
     for poly in mesh.polygons:
-        #for vert in poly.vertices:
         poly_verts = list(poly.vertices)
-        mat = mesh.materials[poly.material_index].name
-        if mat not in mat_list:
-            mat_list.append(mat)
         
-        if any(vert in complex_verts for vert in poly_verts):
-            add_face(poly_verts, indices_04, materials_04)
+        # add materials to mat list
+        material_name = mesh.materials[poly.material_index].name
+        if material_name not in mat_list:
+            mat_list.append(material_name)
+        
+        # add faces
+        if any(vert in complex_verts for vert in poly_verts): # checking if there's any 04 type verts
+            add_face(split_04_faces, material_name, poly_verts)
         else:
-            add_face(poly_verts, indices_03, materials_03)
+            add_face(split_03_faces, material_name, poly_verts)    
     
-    if optimize_attempt:
-        stripped = stripify(indices_03, materials_03, 2500)
-        indices_03 = stripped[0]
-        materials_03 = stripped[1]
-        if len(indices_04) != 0:
-            stripped = stripify(indices_04, materials_04, 2500)
-            indices_04 = stripped[0]
-            materials_04 = stripped[1]
-    
-    #strips
-    add_indices(indices_03, out)
-    out.insert(0, int32_write(0x00030000))
-    out.insert(1, int32_write(len(indices_03)))
-    out.insert(2, get_sector_size(out))
+    print(f"Face Mode: {face_type}")
+    indices_03, materials_03 = collect_indices(split_03_faces.items(), face_type) 
+    indices_04, materials_04 = collect_indices(split_04_faces.items(), face_type) 
+
+    # add strips to binary
+    write_indices(indices_03, out_bytes)
+    out_bytes.insert(0, int32_write(0x00030000)) # magic
+    out_bytes.insert(1, int32_write(len(indices_03))) # count
+    out_bytes.insert(2, get_sector_size(out_bytes)) # size
     if len(indices_04) != 0:
         out04 = []
-        add_indices(indices_04, out04)
-        out04.insert(0, int32_write(0x00040000))
-        out04.insert(1, int32_write(len(indices_04)))
-        out04.insert(2, get_sector_size(out04))
+        write_indices(indices_04, out04)
+        out04.insert(0, int32_write(0x00040000)) # magic 
+        out04.insert(1, int32_write(len(indices_04))) # count
+        out04.insert(2, get_sector_size(out04)) # size
         for l in out04:
-            out.append(l)
+            out_bytes.append(l)
     
     #strip container
-    out.insert(0, int32_write(0x00000005))
-    if len(indices_04) != 0: out.insert(1, int32_write(2))
-    else: out.insert(1, int32_write(1))
-    out.insert(2, get_sector_size(out))
+    out_bytes.insert(0, int32_write(0x00000005)) # magic 
+    if len(indices_04) != 0: out_bytes.insert(1, int32_write(2)) # count = 2 if 04 strips exist (there's two strip sectors)
+    else: out_bytes.insert(1, int32_write(1)) # count = 1 if only 03 strips exist
+    out_bytes.insert(2, get_sector_size(out_bytes)) # size
     
     total_strips = len(indices_03) + len(indices_04)
     
     #material list container
     mat_count = len(mat_list)
-    out.append(int32_write(0x00050000))
-    out.append(int32_write(mat_count))
-    out.append(int32_write(0xC+mat_count*4))
+    out_bytes.append(int32_write(0x00050000))
+    out_bytes.append(int32_write(mat_count))
+    out_bytes.append(int32_write(0xC+mat_count*4))
     for mat in mat_list: 
-        mat_index = int(mat.split('_')[-1].split('.')[0][3:]) #gross
-        out.append(int32_write(mat_index))
+        mat_index = int(mat.split('_')[-1].split('.')[0][3:]) # gross
+        out_bytes.append(int32_write(mat_index))
     
     #material per strip
-    out.append(int32_write(0x00060000))
-    out.append(int32_write(total_strips)) #mat count
-    out.append(int32_write(0xC+total_strips*4)) #mat size 
-    add_materials(materials_03, mat_list, out)
-    add_materials(materials_04, mat_list, out)
+    out_bytes.append(int32_write(0x00060000)) # magic
+    out_bytes.append(int32_write(total_strips)) # count
+    out_bytes.append(int32_write(0xC+total_strips*4)) # size 
+    write_materials(materials_03, mat_list, out_bytes)
+    write_materials(materials_04, mat_list, out_bytes)
     
-    return out
-
-#def stripify(ogtris, ogmats, pass_count, new_tris, new_mats):
-def stripify(tri_list, mat_list, pass_count):
-    #tri_list = ogtris
-    #mat_list = ogmats
-    
-    new_tris = []
-    new_mats = []
-    
-    removecount = 0
-    
-    for passindex in range(pass_count):
-        for index in range(len(tri_list)-1):
-            
-            sizecheck = len(tri_list)-1-removecount
-            if index < sizecheck:
-                triscompared = compare_tris(tri_list[index], tri_list[index+1], mat_list[index], mat_list[index+1]) 
-                
-                if triscompared == 1:
-                    build_strip(tri_list[index], tri_list[index+1], index, tri_list, mat_list, new_tris, new_mats, 1)
-                    removecount = removecount+1
-                
-                elif triscompared == 2:
-                    build_strip(tri_list[index], tri_list[index+1], index, tri_list, mat_list, new_tris, new_mats, 2)
-                    removecount = removecount+1
-                
-                elif triscompared == 3:
-                    build_strip(tri_list[index], tri_list[index+1], index, tri_list, mat_list, new_tris, new_mats, 3)
-                    removecount = removecount+1
-                
-    print(f"Adding remaining triangles ({len(tri_list)})...")
-    for x in tri_list:
-        new_tris.append(x)
-    print(f"Adding remaining materials ({len(mat_list)})...")
-    for x in mat_list:
-        new_mats.append(x)
-    return [new_tris, new_mats]
-    
-def compare_tris(tris_A, tris_B, mat_A, mat_B):
-    if tris_A[-3] == tris_B[-3] and tris_A[-1] == tris_B[-2] and mat_A == mat_B: #strip right
-        return 1
-    elif tris_A[-2] == tris_B[-3] and tris_A[-1] == tris_B[-1] and mat_A == mat_B: #strip down 
-        return 2
-    elif tris_A[-3] == tris_B[-3] and tris_A[-1] == tris_B[-2] and mat_A == mat_B: #strip up
-        return 3
-    
-def build_strip(tris_A, tris_B, remainder, tri_list, mat_list, new_tris, new_mats, order):
-    if order == 1: #right
-        stripped_tris = [ tris_A[-2], tris_A[-1], tris_A[-3], tris_B[-1] ]
-    elif order == 2: #down
-        stripped_tris = [ tris_A[-3], tris_A[-2], tris_A[-1], tris_B[-2] ]
-    elif order == 3: #up
-        stripped_tris = [ tris_A[-2], tris_A[-1], tris_A[-3], tris_B[-1] ]
-    new_tris.append(stripped_tris)
-    new_mats.append(mat_list[remainder])
-    tri_list.pop(remainder)
-    tri_list.pop(remainder)
-    mat_list.pop(remainder)
-    mat_list.pop(remainder)
+    object.to_mesh_clear()
+    return out_bytes
   
 def get_vert_coord(object):
     out = []
@@ -424,7 +380,7 @@ def get_bounding(object):
     else:
         return
 
-def get_amo(optimize):
+def get_amo(face_type):
     finalbytes = []
     collection = bpy.context.view_layer.active_layer_collection.collection
     mesh_count = len([obj for obj in collection.objects if obj.type == 'MESH'])
@@ -436,7 +392,7 @@ def get_amo(optimize):
             out = []
             object.data.calc_loop_triangles()
             
-            mesh_indices   = get_indices(object, optimize)
+            mesh_indices   = get_indices(object, face_type)
             vertex_coords  = get_vert_coord(object)
             vertex_normals = get_vert_normal(object)
             vertex_UVs     = get_vert_UVs(object)
@@ -504,12 +460,11 @@ def get_amo(optimize):
         
     return mesh_out
 
-def write(context, filepath, optimize_attempt):
+def write(context, filepath, face_type):
     print("Exporting Artistoon Model...")
-    amo = get_amo(optimize_attempt)
+    amo = get_amo(face_type)
     f = open(filepath, 'wb')
     for byte in amo:
-        #print(byte.hex())
         f.write(byte)
     f.close()
     return {'FINISHED'}

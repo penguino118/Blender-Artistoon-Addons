@@ -50,16 +50,20 @@ class Export_AMO(Operator, ExportHelper):
         options={'HIDDEN'},
         maxlen=255,  # Max internal buffer length, longer would be clamped.
     )
-
-    optimize_attempt: BoolProperty(
-        name="Optimize Meshes",
-        description="Attempts optimize meshes by joining neighbour triangles into triangle strips.",
-        default=False,
+    
+    face_type: EnumProperty(
+        name="Index Mode",
+        description="How the exported model will store face indices",
+        items=(
+            ('TRI_STRIP', "Triangle Strip", "Compatible triangles are connected together to save memory"),
+            ('TRI_LIST', "Triangle List", "Each triangle is stored separately, less memory efficient"),
+        ),
+        default='TRI_STRIP',
     )
-
+    
     def execute(self, context):
         from .file_handling.artistoon_export import AMO_exporter
-        return AMO_exporter.write(context, self.filepath, self.optimize_attempt)
+        return AMO_exporter.write(context, self.filepath, self.face_type)
 
 
 # IMPORT #

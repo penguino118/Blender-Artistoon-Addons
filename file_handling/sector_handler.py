@@ -4,7 +4,6 @@ from .binary_rw import int32_write
 def get_sector_size(array):
     tmpb = 0x4
     for fun in array:
-        print(fun.hex())
         ppp = fun.hex()
         tmpb += int(len(ppp)/2)
     tmpb = int32_write(tmpb)
