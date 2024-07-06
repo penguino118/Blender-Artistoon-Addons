@@ -32,11 +32,8 @@ Auto Modellista meshes should work well, too.
 ## Model Exporter (AMO)
 ### To-do
 - [x]  Fix mesh normals operations for newer blender versions
-- [ ]  Auto split face corners with multiple UVs
-    - Engine is limited to having one vertex per UV. Exporter currently just picks the UV from the first face corner of a vertex
-- [ ]  Find better solution for Triangle Strips
-    - Current solution is unnefficient and ocasionally messes up list order while handling multiple materials.
-    - Check out [pyffi's stripifier](https://github.com/niftools/pyffi)
+- [x]  Auto split face corners with multiple UVs
+- [x]  Find better solution for Triangle Strips
 
 ## Armature Exporter (AHI)
 ### To-do

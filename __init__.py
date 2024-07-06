@@ -61,9 +61,15 @@ class Export_AMO(Operator, ExportHelper):
         default='TRI_STRIP',
     )
     
+    uv_split: BoolProperty(
+        name="Split Faces by UVs",
+        description="Automatically splits face corners that make vertices have multiple UVs to safely store them per vertex",
+        default=True,
+    )
+    
     def execute(self, context):
         from .file_handling.artistoon_export import AMO_exporter
-        return AMO_exporter.write(context, self.filepath, self.face_type)
+        return AMO_exporter.write(context, self.filepath, self.uv_split, self.face_type)
 
 
 # IMPORT #

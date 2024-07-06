@@ -1,5 +1,6 @@
 import bpy
 import bmesh
+from itertools import groupby
 from ..binary_rw import int16_write, int32_write, float_write, int32_write_list, pad_bytes
 from ..sector_handler import get_sector_size
 from ...pyffi.utils import tristrip
@@ -98,14 +99,7 @@ def get_global_materials(collection):
         out.append(x)
     return out
 
-def get_indices(object, face_type):
-    
-    def triangulate(mesh):
-        bm = bmesh.new()
-        bm.from_mesh(mesh)
-        bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='LONG_EDGE')
-        bm.to_mesh(mesh)
-        bm.free()
+def get_indices(object, mesh, face_type):
 
     def write_indices(list, out):
         for poly in list:
@@ -137,8 +131,6 @@ def get_indices(object, face_type):
                 collected_materials.append(material)
         return collected_indices, collected_materials
         
-    mesh = object.to_mesh(preserve_all_data_layers=True)
-    triangulate(mesh)
     
     out_bytes = []
     complex_verts = []
@@ -213,12 +205,10 @@ def get_indices(object, face_type):
     write_materials(materials_03, mat_list, out_bytes)
     write_materials(materials_04, mat_list, out_bytes)
     
-    object.to_mesh_clear()
     return out_bytes
   
-def get_vert_coord(object):
+def get_vert_coord(mesh):
     out = []
-    mesh = object.data
     vert_count = int32_write(len(mesh.vertices))
     
     for vert in mesh.vertices:
@@ -234,9 +224,8 @@ def get_vert_coord(object):
     #out.append(x for x in out)
     return out 
 
-def get_vert_normal(object):
+def get_vert_normal(mesh):
     out = []
-    mesh = object.data
     vert_count = int32_write(len(mesh.vertices))
     
     for vert in mesh.vertices:
@@ -252,9 +241,8 @@ def get_vert_normal(object):
     #out.append(x for x in out)
     return out 
 
-def get_vert_UVs(object):
+def get_vert_UVs(mesh): # GROSS ! ! !
     out = []
-    mesh = object.data
     vert_count = int32_write(len(mesh.vertices))
     
     tmpuv = []
@@ -278,9 +266,8 @@ def get_vert_UVs(object):
     #out.append(x for x in out)
     return out 
 
-def get_vert_color(object):
+def get_vert_color(mesh):
     out = []
-    mesh = object.data
     vert_count = int32_write(len(mesh.vertices))
     color_attribute = mesh.color_attributes.active_color
     if color_attribute != None:
@@ -320,8 +307,7 @@ def get_vert_group(object):
         #out.append(x for x in out)
     return out
 
-def get_attributes(object):
-    mesh = object.data
+def get_attributes(mesh):
     out = []
     if len(mesh.keys()) != 0:
         attributes = [
@@ -357,8 +343,7 @@ def get_attributes(object):
     else:
         return
 
-def get_bounding(object):
-    mesh = object.data
+def get_bounding(mesh):
     out = []
     if len(mesh.keys()) != 0:
         bound = []
@@ -380,7 +365,45 @@ def get_bounding(object):
     else:
         return
 
-def get_amo(face_type):
+def triangulate_bmesh(mesh):
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='LONG_EDGE')
+    bm.to_mesh(mesh)
+    bm.free()
+
+def uv_split_bmesh(mesh): # GROSS !! ! ! !! 
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    
+    packed_uv = []
+    for face in mesh.polygons:
+        for vertindex, loopindex in zip(face.vertices, face.loop_indices):
+            uv_coords = mesh.uv_layers.active.data[loopindex].uv
+            packed_uv.append([vertindex, uv_coords])
+
+
+    edges_to_split = []
+
+    for vert in bm.verts:
+        
+        index = vert.index
+        vert_uvs = [uv for uv in packed_uv if index in uv]
+        
+        if not all_equal(vert_uvs):
+            for edge in bm.edges :
+                if vert in edge.verts:
+                    if edge not in edges_to_split:
+                        edges_to_split.append(edge)
+
+    bmesh.ops.split_edges(bm, edges=edges_to_split)
+    bm.edges.index_update()
+    
+    bm.verts.index_update()
+    bm.to_mesh(mesh)
+    bm.free()
+
+def get_amo(uv_split, face_type):
     finalbytes = []
     collection = bpy.context.view_layer.active_layer_collection.collection
     mesh_count = len([obj for obj in collection.objects if obj.type == 'MESH'])
@@ -390,17 +413,26 @@ def get_amo(face_type):
     for object in collection.objects:
         if object.type == 'MESH':
             out = []
-            object.data.calc_loop_triangles()
             
-            mesh_indices   = get_indices(object, face_type)
-            vertex_coords  = get_vert_coord(object)
-            vertex_normals = get_vert_normal(object)
-            vertex_UVs     = get_vert_UVs(object)
-            vertex_colors  = get_vert_color(object)
-            vertex_groups  = get_vert_group(object)
-            attributes     = get_attributes(object)
-            bounding       = get_bounding(object)
-          
+            edit_object = object.copy()
+            edit_object.data = object.data.copy()
+            edit_object.data.calc_loop_triangles()
+            mesh = edit_object.data
+            
+            triangulate_bmesh(mesh)
+            if uv_split: uv_split_bmesh(mesh)
+            
+            mesh_indices   = get_indices(edit_object, mesh, face_type)
+            vertex_coords  = get_vert_coord(mesh)
+            vertex_normals = get_vert_normal(mesh)
+            vertex_UVs     = get_vert_UVs(mesh)
+            vertex_colors  = get_vert_color(mesh)
+            vertex_groups  = get_vert_group(edit_object)
+            attributes     = get_attributes(mesh)
+            bounding       = get_bounding(mesh)
+            
+            bpy.data.objects.remove(edit_object)
+            
             sector_count = 0
             if len(mesh_indices) != 0:
                 sector_count += 3
@@ -460,11 +492,15 @@ def get_amo(face_type):
         
     return mesh_out
 
-def write(context, filepath, face_type):
+def write(context, filepath, uv_split, face_type):
     print("Exporting Artistoon Model...")
-    amo = get_amo(face_type)
+    amo = get_amo(uv_split, face_type)
     f = open(filepath, 'wb')
     for byte in amo:
         f.write(byte)
     f.close()
     return {'FINISHED'}
+
+def all_equal(iterable):
+    g = groupby(iterable)
+    return next(g, True) and not next(g, False)
