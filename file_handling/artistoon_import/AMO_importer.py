@@ -234,11 +234,16 @@ def get_indices(buffer, offset, sector_size, strip_count, list, tmp_strip_length
         if offset >= sector_size:
             return
 
-def get_vert_coords(buffer, offset, sector_size, vertex_count, list):
+def get_vert_coords(buffer, offset, sector_size, vertex_count, list, scale):
     for x in range(vertex_count):
-        #if upflag:
-        #    vertpos = float_read(buffer, offset), float_read(buffer, offset+0x8), float_read(buffer, offset+0x4)
-        #else:
+        vertpos = float_read(buffer, offset)*scale, float_read(buffer, offset+0x4)*scale, float_read(buffer, offset+0x8)*scale
+        list.append(vertpos)
+        offset += 0xC
+        if offset >= sector_size:
+            return
+
+def get_vert_normals(buffer, offset, sector_size, vertex_count, list):
+    for x in range(vertex_count):
         vertpos = float_read(buffer, offset), float_read(buffer, offset+0x4), float_read(buffer, offset+0x8)
         list.append(vertpos)
         offset += 0xC
@@ -433,7 +438,7 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
 
     bm.free()
 
-def amo_read(filedata, filepath, upflag):
+def amo_read(filedata, filepath, upflag, scale):
     filebuffer = filedata
     filename = os.path.basename(filepath)
     sector = get_sector_header(filebuffer, 0x0)
@@ -507,11 +512,11 @@ def amo_read(filedata, filepath, upflag):
                         read_offset += 0x4
                 
                 elif main_sector[0] == "AMO_vertex_coordinates":
-                    get_vert_coords(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_coords)
+                    get_vert_coords(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_coords, scale)
                     read_offset += main_sector[2]
                 
                 elif main_sector[0] == "AMO_vertex_normals":
-                    get_vert_coords(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_normals)
+                    get_vert_normals(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_normals)
                     read_offset += main_sector[2]
                 
                 elif main_sector[0] == "AMO_vertex_UVs":
@@ -554,10 +559,10 @@ def amo_read(filedata, filepath, upflag):
             build_mesh(collection, model_index, filename, mesh_data, tmp_strip_length, upflag)
 
 
-def read(context, filepath, upflag): #, use_some_setting
+def read(context, filepath, upflag,  scale): #, use_some_setting
     print("running read_some_data...")
     f = open(filepath, 'rb')
     data = f.read()
     f.close()
-    amo_read(data, filepath, upflag)
+    amo_read(data, filepath, upflag, scale)
     return {'FINISHED'}

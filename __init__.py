@@ -14,7 +14,7 @@ bl_info = {
 
 ### classes ###
 from bpy_extras.io_utils import ExportHelper, ImportHelper
-from bpy.props import StringProperty, BoolProperty, EnumProperty
+from bpy.props import StringProperty, BoolProperty, EnumProperty, FloatProperty
 from bpy.types import Operator
 
 # EXPORT #
@@ -51,6 +51,14 @@ class Export_AMO(Operator, ExportHelper):
         maxlen=255,  # Max internal buffer length, longer would be clamped.
     )
     
+    scale: FloatProperty(
+        name="Scale",
+        description="Scale by which the objects will be transformed on export",
+        default=10.0,
+        min=0.001,
+        max=1000.0,
+    )
+    
     face_type: EnumProperty(
         name="Index Mode",
         description="How the exported model will store face indices",
@@ -69,7 +77,7 @@ class Export_AMO(Operator, ExportHelper):
     
     def execute(self, context):
         from .file_handling.artistoon_export import AMO_exporter
-        return AMO_exporter.write(context, self.filepath, self.uv_split, self.face_type)
+        return AMO_exporter.write(context, self.filepath, self.uv_split, self.face_type, self.scale)
 
 
 # IMPORT #
@@ -105,10 +113,10 @@ class Import_AHI(Operator, ImportHelper):
         options={'HIDDEN'},
         maxlen=255,  # Max internal buffer length, longer would be clamped.
     )
-
+    
     z_up: BoolProperty(
-        name="Rotate Z to up",
-        description="Rotates the object so it faces up in the Z axis.",
+        name="Rotate Up Axis",
+        description="Rotates the object so it faces up in the Z axis",
         default=True,
     )
 
@@ -133,14 +141,22 @@ class Import_AMO(Operator, ImportHelper):
     # List of operator properties, the attributes will be assigned
     # to the class instance from the operator settings before calling.
     z_up: BoolProperty(
-        name="Rotate Z to up",
-        description="Rotates the objects so the meshes face up in the Z axis.",
+        name="Rotate Up Axis",
+        description="Rotates the objects so the meshes face up in the Z axis",
         default=True,
+    )
+    
+    scale: FloatProperty(
+        name="Scale",
+        description="Scale by which the objects will be transformed",
+        default=0.1,
+        min=0.001,
+        max=1000.0,
     )
     
     def execute(self, context):
         from .file_handling.artistoon_import import AMO_importer
-        return AMO_importer.read(context, self.filepath, self.z_up) # self.use_setting
+        return AMO_importer.read(context, self.filepath, self.z_up, self.scale) # self.use_setting
 
 ### ###
 

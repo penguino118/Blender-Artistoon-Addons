@@ -207,15 +207,15 @@ def get_indices(object, mesh, face_type):
     
     return out_bytes
   
-def get_vert_coord(mesh):
+def get_vert_coord(mesh, scale):
     out = []
     vert_count = int32_write(len(mesh.vertices))
     
     for vert in mesh.vertices:
         #coord = [vert.co.xyz[0], vert.co.xyz[1], vert.co.xyz[2]]
-        out.append(float_write(vert.co.xyz[0]))
-        out.append(float_write(vert.co.xyz[1]))
-        out.append(float_write(vert.co.xyz[2]))
+        out.append(float_write(vert.co.xyz[0]*scale))
+        out.append(float_write(vert.co.xyz[1]*scale))
+        out.append(float_write(vert.co.xyz[2]*scale))
         #out.append(x for x in float_write_list(coord))
     
     out.insert(0, int32_write(0x00070000))
@@ -403,7 +403,7 @@ def uv_split_bmesh(mesh): # GROSS !! ! ! !!
     bm.to_mesh(mesh)
     bm.free()
 
-def get_amo(uv_split, face_type):
+def get_amo(uv_split, face_type, scale):
     finalbytes = []
     collection = bpy.context.view_layer.active_layer_collection.collection
     mesh_count = len([obj for obj in collection.objects if obj.type == 'MESH'])
@@ -423,7 +423,7 @@ def get_amo(uv_split, face_type):
             if uv_split: uv_split_bmesh(mesh)
             
             mesh_indices   = get_indices(edit_object, mesh, face_type)
-            vertex_coords  = get_vert_coord(mesh)
+            vertex_coords  = get_vert_coord(mesh, scale)
             vertex_normals = get_vert_normal(mesh)
             vertex_UVs     = get_vert_UVs(mesh)
             vertex_colors  = get_vert_color(mesh)
@@ -492,9 +492,9 @@ def get_amo(uv_split, face_type):
         
     return mesh_out
 
-def write(context, filepath, uv_split, face_type):
+def write(context, filepath, uv_split, face_type, scale):
     print("Exporting Artistoon Model...")
-    amo = get_amo(uv_split, face_type)
+    amo = get_amo(uv_split, face_type, scale)
     f = open(filepath, 'wb')
     for byte in amo:
         f.write(byte)
