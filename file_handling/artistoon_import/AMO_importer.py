@@ -33,134 +33,135 @@ def print_sector(sector):
         print("invalid sector!! size under 3")
     print(f"Sector Type: {sector[0]}, Data Count: {sector[1]}, Size: {sector[2]}")
 
-def create_material(filename, index, material_type, texture_index, material_list, material_property):
+def create_material(filename, index, material_type, texture_index, material_list, material_property, shader_nodes):
     material_name = f"{filename[:-4]}_mat{index}"
     material = bpy.data.materials.new(material_name) 
     material_list.append(material)
     material.use_nodes = True
     nodes = material.node_tree.nodes
     
-    print(material_property)
-    unkproperty1 = material_property[index][1]
-    unkproperty2 = material_property[index][2]
-    unkproperty3 = material_property[index][3]
-    unkproperty4 = material_property[index][4]
-    unkproperty5 = material_property[index][5]
-    
-    material['mat_type'] = material_property[index][0]
-    material['unknown_1'] = unkproperty1
-    material['unknown_2'] = unkproperty2
-    material['unknown_3'] = unkproperty3
-    material['unknown_4'] = unkproperty4
-    material['unknown_5'] = unkproperty5
-    material['tex_image'] = material_property[index][6]
-    
-    #bsdf = 
-    if nodes.get("Principled BSDF") != None:
-        nodes.remove(nodes.get("Principled BSDF"))
-    
-    #material_output = nodes.get("ShaderNodeOutputMaterial")
-    #print(material_output)
-    material_output = nodes.get("Material Output") 
-    imgnode = nodes.new('ShaderNodeTexImage')
-    imgnode.image = bpy.data.images.get(f"{filename[:-4]}_tex{texture_index}")
-    
-    links = material.node_tree.links
-    
-    #print(imgnode.inputs)
-    #print(nodes.get("Mix"))
-    if material_type == "CelShaded":
-        diffuse = nodes.new('ShaderNodeBsdfDiffuse')
-        specular = nodes.new('ShaderNodeBsdfDiffuse')
+    if shader_nodes:
+        print(material_property)
+        unkproperty1 = material_property[index][1]
+        unkproperty2 = material_property[index][2]
+        unkproperty3 = material_property[index][3]
+        unkproperty4 = material_property[index][4]
+        unkproperty5 = material_property[index][5]
         
-        difframpnode = nodes.new('ShaderNodeValToRGB')
-        specrampnode = nodes.new('ShaderNodeValToRGB')
+        material['mat_type'] = material_property[index][0]
+        material['unknown_1'] = unkproperty1
+        material['unknown_2'] = unkproperty2
+        material['unknown_3'] = unkproperty3
+        material['unknown_4'] = unkproperty4
+        material['unknown_5'] = unkproperty5
+        material['tex_image'] = material_property[index][6]
         
-        difftorgbnode = nodes.new('ShaderNodeShaderToRGB')
-        spectorgbnode = nodes.new('ShaderNodeShaderToRGB')
+        #bsdf = 
+        if nodes.get("Principled BSDF") != None:
+            nodes.remove(nodes.get("Principled BSDF"))
         
-        multcolmixnode = nodes.new('ShaderNodeMixRGB')
-        multdifmixnode = nodes.new('ShaderNodeMixRGB')
-        screenmixnode = nodes.new('ShaderNodeMixRGB')
+        #material_output = nodes.get("ShaderNodeOutputMaterial")
+        #print(material_output)
+        material_output = nodes.get("Material Output") 
+        imgnode = nodes.new('ShaderNodeTexImage')
+        imgnode.image = bpy.data.images.get(f"{filename[:-4]}_tex{texture_index}")
         
-        colnode = nodes.new('ShaderNodeVertexColor')
+        links = material.node_tree.links
         
-        #diffuse color ramp
-        #[0] - 0.00 - #CECECE
-        #[1] - 0.38 - #BABABA
-        #[2] - 0.50 - #FFFFFF
-        #[3] - 1.00 - #FFFFFF
-        
-        #spec color ramp
-        #[0] - 0.00 - #000000
-        #[1] - 0.95 - col= 0.60
-        
-        difframpnode.location    = (-124, 828)
-        specrampnode.location    = (-132, 588)
-        diffuse.location         = (-574, 808)
-        difftorgbnode.location   = (-346, 800)
-        spectorgbnode.location   = (-346, 557)
-        specular.location        = (-574, 565)
-        specrampnode.location    = (-346, 556)
-        colnode.location         = (-360, 280)
-        multcolmixnode.location  = ( -39, 327)
-        multdifmixnode.location  = ( 215, 333)
-        screenmixnode.location   = ( 493, 363)
-        imgnode.location         = (-459, 150)
-        material_output.location = ( 713, 380)
-        
-        #multcolmixnode.data_type = 'RGBA'
-        multcolmixnode.blend_type = 'MULTIPLY'
-        multcolmixnode.inputs[0].default_value = 1.000
-        
-        #multdifmixnode.data_type = 'RGBA'
-        multdifmixnode.blend_type = 'MULTIPLY'
-        multdifmixnode.inputs[0].default_value = 1.000
-        
-        #screenmixnode.data_type = 'RGBA'
-        screenmixnode.blend_type = 'SCREEN'
-        screenmixnode.inputs[0].default_value = 1.000
-        
-        difframpnode.color_ramp.interpolation = 'CONSTANT'
-        difframpnode.color_ramp.elements[0].color = (0.60, 0.60, 0.60, 1.00)
-        
-        difframpnode.color_ramp.elements.new(0.38)
-        difframpnode.color_ramp.elements[1].color = (0.50, 0.50, 0.50, 1.00)
-        
-        difframpnode.color_ramp.elements.new(0.50)
-        difframpnode.color_ramp.elements[2].color = (1.00, 1.00, 1.00, 1.00)
-        
-        specrampnode.color_ramp.interpolation = 'CONSTANT'
-        specrampnode.color_ramp.elements[0].color = (0.00, 0.00, 0.00, 0.00)
-        specrampnode.color_ramp.elements.new(0.95)
-        specrampnode.color_ramp.elements[1].color = (0.60, 0.60, 0.60, 1.00)
-        
-        #links.new(multcolmixnode.inputs[1], colnode.outputs[0])
-        #links.new(multcolmixnode.inputs[2], imgnode.outputs[0])
-        
-        links.new(diffuse.outputs['BSDF'],  difftorgbnode.inputs['Shader'])
-        links.new(specular.outputs['BSDF'], spectorgbnode.inputs['Shader'])
-        
-        links.new(difftorgbnode.outputs['Color'],  difframpnode.inputs['Fac'])
-        links.new(spectorgbnode.outputs['Color'],  specrampnode.inputs['Fac'])
-        
-        links.new(colnode.outputs['Color'], multcolmixnode.inputs['Color1'])
-        links.new(imgnode.outputs['Color'], multcolmixnode.inputs['Color2'])
-        
-        links.new(multcolmixnode.outputs['Color'], multdifmixnode.inputs['Color1'])
-        links.new(difframpnode.outputs['Color'], multdifmixnode.inputs['Color2'])
-        
-        links.new(specrampnode.outputs['Color'], screenmixnode.inputs['Color1'])
-        links.new(multdifmixnode.outputs['Color'], screenmixnode.inputs['Color2'])
-        
-        links.new(screenmixnode.outputs['Color'], material_output.inputs['Surface'])
-        
-    else:
-        imgnode.location = (-350, 350)
-        links.new(material_output.inputs['Surface'], imgnode.outputs[0])
+        #print(imgnode.inputs)
+        #print(nodes.get("Mix"))
+        if material_type == "CelShaded":
+            diffuse = nodes.new('ShaderNodeBsdfDiffuse')
+            specular = nodes.new('ShaderNodeBsdfDiffuse')
+            
+            difframpnode = nodes.new('ShaderNodeValToRGB')
+            specrampnode = nodes.new('ShaderNodeValToRGB')
+            
+            difftorgbnode = nodes.new('ShaderNodeShaderToRGB')
+            spectorgbnode = nodes.new('ShaderNodeShaderToRGB')
+            
+            multcolmixnode = nodes.new('ShaderNodeMixRGB')
+            multdifmixnode = nodes.new('ShaderNodeMixRGB')
+            screenmixnode = nodes.new('ShaderNodeMixRGB')
+            
+            colnode = nodes.new('ShaderNodeVertexColor')
+            
+            #diffuse color ramp
+            #[0] - 0.00 - #CECECE
+            #[1] - 0.38 - #BABABA
+            #[2] - 0.50 - #FFFFFF
+            #[3] - 1.00 - #FFFFFF
+            
+            #spec color ramp
+            #[0] - 0.00 - #000000
+            #[1] - 0.95 - col= 0.60
+            
+            difframpnode.location    = (-124, 828)
+            specrampnode.location    = (-132, 588)
+            diffuse.location         = (-574, 808)
+            difftorgbnode.location   = (-346, 800)
+            spectorgbnode.location   = (-346, 557)
+            specular.location        = (-574, 565)
+            specrampnode.location    = (-346, 556)
+            colnode.location         = (-360, 280)
+            multcolmixnode.location  = ( -39, 327)
+            multdifmixnode.location  = ( 215, 333)
+            screenmixnode.location   = ( 493, 363)
+            imgnode.location         = (-459, 150)
+            material_output.location = ( 713, 380)
+            
+            #multcolmixnode.data_type = 'RGBA'
+            multcolmixnode.blend_type = 'MULTIPLY'
+            multcolmixnode.inputs[0].default_value = 1.000
+            
+            #multdifmixnode.data_type = 'RGBA'
+            multdifmixnode.blend_type = 'MULTIPLY'
+            multdifmixnode.inputs[0].default_value = 1.000
+            
+            #screenmixnode.data_type = 'RGBA'
+            screenmixnode.blend_type = 'SCREEN'
+            screenmixnode.inputs[0].default_value = 1.000
+            
+            difframpnode.color_ramp.interpolation = 'CONSTANT'
+            difframpnode.color_ramp.elements[0].color = (0.60, 0.60, 0.60, 1.00)
+            
+            difframpnode.color_ramp.elements.new(0.38)
+            difframpnode.color_ramp.elements[1].color = (0.50, 0.50, 0.50, 1.00)
+            
+            difframpnode.color_ramp.elements.new(0.50)
+            difframpnode.color_ramp.elements[2].color = (1.00, 1.00, 1.00, 1.00)
+            
+            specrampnode.color_ramp.interpolation = 'CONSTANT'
+            specrampnode.color_ramp.elements[0].color = (0.00, 0.00, 0.00, 0.00)
+            specrampnode.color_ramp.elements.new(0.95)
+            specrampnode.color_ramp.elements[1].color = (0.60, 0.60, 0.60, 1.00)
+            
+            #links.new(multcolmixnode.inputs[1], colnode.outputs[0])
+            #links.new(multcolmixnode.inputs[2], imgnode.outputs[0])
+            
+            links.new(diffuse.outputs['BSDF'],  difftorgbnode.inputs['Shader'])
+            links.new(specular.outputs['BSDF'], spectorgbnode.inputs['Shader'])
+            
+            links.new(difftorgbnode.outputs['Color'],  difframpnode.inputs['Fac'])
+            links.new(spectorgbnode.outputs['Color'],  specrampnode.inputs['Fac'])
+            
+            links.new(colnode.outputs['Color'], multcolmixnode.inputs['Color1'])
+            links.new(imgnode.outputs['Color'], multcolmixnode.inputs['Color2'])
+            
+            links.new(multcolmixnode.outputs['Color'], multdifmixnode.inputs['Color1'])
+            links.new(difframpnode.outputs['Color'], multdifmixnode.inputs['Color2'])
+            
+            links.new(specrampnode.outputs['Color'], screenmixnode.inputs['Color1'])
+            links.new(multdifmixnode.outputs['Color'], screenmixnode.inputs['Color2'])
+            
+            links.new(screenmixnode.outputs['Color'], material_output.inputs['Surface'])
+            
+        else:
+            imgnode.location = (-350, 350)
+            links.new(material_output.inputs['Surface'], imgnode.outputs[0])
     return
 
-def build_materials(collection, filename, buffer, offset, material_start, material_list):
+def build_materials(collection, filename, buffer, offset, material_start, material_list, shader_nodes):
     print("Building materials...")
     offset += material_start
     material_properties = get_sector_header(buffer, offset)
@@ -204,7 +205,7 @@ def build_materials(collection, filename, buffer, offset, material_start, materi
             tex_height = int32_read(buffer, offset+0x14)
             tmp_tex_list.append([tex_index, tex_width, tex_height])
             mat_type = tmp_mat_list[x]
-            create_material(filename, x, mat_type, tex_index, material_list, mat_property)
+            create_material(filename, x, mat_type, tex_index, material_list, mat_property, shader_nodes)
             offset += buf_skip
         for x in range(len(tmp_tex_list)):
             tex_index  = tmp_tex_list[x][0]
@@ -371,7 +372,11 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
     uv_layer = bm.loops.layers.uv.new()
     for face in bm.faces:
         for loop in face.loops:
-            loop[uv_layer].uv = vertUVs[loop.vert.index]
+            try:
+                loop[uv_layer].uv = vertUVs[loop.vert.index]
+            except:
+                print(f"invalid: loop[uv_layer].uv = vertUVs[{loop.vert.index}] // vertcount={len(bm.verts)}")
+                continue
     bm.to_mesh(target_mesh)
     
     #strip list to face list
@@ -438,7 +443,7 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
 
     bm.free()
 
-def amo_read(filedata, filepath, upflag, scale):
+def amo_read(filedata, filepath, upflag, scale, shader_nodes):
     filebuffer = filedata
     filename = os.path.basename(filepath)
     sector = get_sector_header(filebuffer, 0x0)
@@ -463,7 +468,7 @@ def amo_read(filedata, filepath, upflag, scale):
         collection = bpy.data.collections.new(collection_name)
         bpy.context.scene.collection.children.link(collection)
         model_materials = []
-        build_materials(collection, filename, filebuffer, read_offset, model_container[2], model_materials)
+        build_materials(collection, filename, filebuffer, read_offset, model_container[2], model_materials, shader_nodes)
         read_offset += 0xC
         model_count = model_container[1]
         for model_index in range(model_count):
@@ -559,10 +564,10 @@ def amo_read(filedata, filepath, upflag, scale):
             build_mesh(collection, model_index, filename, mesh_data, tmp_strip_length, upflag)
 
 
-def read(context, filepath, upflag,  scale): #, use_some_setting
+def read(context, filepath, upflag, scale, shader_nodes): #, use_some_setting
     print("running read_some_data...")
     f = open(filepath, 'rb')
     data = f.read()
     f.close()
-    amo_read(data, filepath, upflag, scale)
+    amo_read(data, filepath, upflag, scale, shader_nodes)
     return {'FINISHED'}

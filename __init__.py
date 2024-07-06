@@ -140,12 +140,6 @@ class Import_AMO(Operator, ImportHelper):
 
     # List of operator properties, the attributes will be assigned
     # to the class instance from the operator settings before calling.
-    z_up: BoolProperty(
-        name="Rotate Up Axis",
-        description="Rotates the objects so the meshes face up in the Z axis",
-        default=True,
-    )
-    
     scale: FloatProperty(
         name="Scale",
         description="Scale by which the objects will be transformed",
@@ -154,9 +148,24 @@ class Import_AMO(Operator, ImportHelper):
         max=1000.0,
     )
     
+    z_up: BoolProperty(
+        name="Rotate Up Axis",
+        description="Rotates the objects so the meshes face up in the Z axis",
+        default=True,
+    )
+    
+    
+    shader_nodes: BoolProperty(
+        name="Set Up Material Nodes",
+        description="Automatically set up shader nodes for certain material types",
+        default=False,
+    )
+    
+    
+    
     def execute(self, context):
         from .file_handling.artistoon_import import AMO_importer
-        return AMO_importer.read(context, self.filepath, self.z_up, self.scale) # self.use_setting
+        return AMO_importer.read(context, self.filepath, self.z_up, self.scale, self.shader_nodes) # self.use_setting
 
 ### ###
 
