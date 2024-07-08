@@ -40,22 +40,22 @@ def create_material(filename, index, material_type, texture_index, material_list
     material.use_nodes = True
     nodes = material.node_tree.nodes
     
+    print(material_property)
+    unkproperty1 = material_property[index][1]
+    unkproperty2 = material_property[index][2]
+    unkproperty3 = material_property[index][3]
+    unkproperty4 = material_property[index][4]
+    unkproperty5 = material_property[index][5]
+    
+    material['mat_type'] = material_property[index][0]
+    material['unknown_1'] = unkproperty1
+    material['unknown_2'] = unkproperty2
+    material['unknown_3'] = unkproperty3
+    material['unknown_4'] = unkproperty4
+    material['unknown_5'] = unkproperty5
+    material['tex_image'] = material_property[index][6]
+    
     if shader_nodes:
-        print(material_property)
-        unkproperty1 = material_property[index][1]
-        unkproperty2 = material_property[index][2]
-        unkproperty3 = material_property[index][3]
-        unkproperty4 = material_property[index][4]
-        unkproperty5 = material_property[index][5]
-        
-        material['mat_type'] = material_property[index][0]
-        material['unknown_1'] = unkproperty1
-        material['unknown_2'] = unkproperty2
-        material['unknown_3'] = unkproperty3
-        material['unknown_4'] = unkproperty4
-        material['unknown_5'] = unkproperty5
-        material['tex_image'] = material_property[index][6]
-        
         #bsdf = 
         if nodes.get("Principled BSDF") != None:
             nodes.remove(nodes.get("Principled BSDF"))
