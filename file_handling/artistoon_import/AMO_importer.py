@@ -324,7 +324,7 @@ def get_mesh_hit(buf, offset, count, list):
         unk2 = (float_read(buf, offset+0x8), float_read(buf, offset+0xC))
         list.append([unk1, unk2])
 
-def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
+def build_mesh(collection, index, filename, mesh_data, striplength, z_up):
     indices       = mesh_data[0]
     mat_list      = mesh_data[1]
     mat_per_strip = mesh_data[2]
@@ -342,7 +342,7 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
     created_mesh = bpy.data.objects.new(mesh_name, target_mesh)
     collection.objects.link(created_mesh)
     
-    if upflag:
+    if z_up:
         created_mesh.rotation_euler = (math.radians(90), 0.0, math.radians(180))
     
     for mat_index in mat_list:
@@ -443,7 +443,7 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
 
     bm.free()
 
-def amo_read(filedata, filepath, upflag, scale, use_shader_nodes):
+def amo_read(filedata, filepath, z_up, scale, use_shader_nodes):
     filebuffer = filedata
     filename = os.path.basename(filepath)
     sector = get_sector_header(filebuffer, 0x0)
@@ -561,13 +561,13 @@ def amo_read(filedata, filepath, upflag, scale, use_shader_nodes):
             mesh_hitbox_fetch,
             model_materials
             ]
-            build_mesh(collection, model_index, filename, mesh_data, tmp_strip_length, upflag)
+            build_mesh(collection, model_index, filename, mesh_data, tmp_strip_length, z_up)
 
 
-def read(context, filepath, upflag, scale, use_shader_nodes): #, use_some_setting
+def read(context, filepath, z_up, scale, use_shader_nodes): #, use_some_setting
     print("running read_some_data...")
     f = open(filepath, 'rb')
     data = f.read()
     f.close()
-    amo_read(data, filepath, upflag, scale, use_shader_nodes)
+    amo_read(data, filepath, z_up, scale, use_shader_nodes)
     return {'FINISHED'}
