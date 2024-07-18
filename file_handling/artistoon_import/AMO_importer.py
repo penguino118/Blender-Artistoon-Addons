@@ -235,18 +235,22 @@ def get_indices(buffer, offset, sector_size, strip_count, list, tmp_strip_length
         if offset >= sector_size:
             return
 
-def get_vert_coords(buffer, offset, sector_size, vertex_count, list, scale):
+def get_vert_coords(buffer, offset, sector_size, vertex_count, list, scale, z_up):
+    rotation = mathutils.Euler((math.radians(90.0), 0.0, 0.0), 'XYZ')
     for x in range(vertex_count):
-        vertpos = float_read(buffer, offset)*scale, float_read(buffer, offset+0x4)*scale, float_read(buffer, offset+0x8)*scale
+        vertpos = mathutils.Vector((float_read(buffer, offset)*scale, float_read(buffer, offset+0x4)*scale, float_read(buffer, offset+0x8)*scale))
+        if z_up: vertpos.rotate(rotation)
         list.append(vertpos)
         offset += 0xC
         if offset >= sector_size:
             return
 
-def get_vert_normals(buffer, offset, sector_size, vertex_count, list):
+def get_vert_normals(buffer, offset, sector_size, vertex_count, list, z_up):
+    rotation = mathutils.Euler((math.radians(90.0), 0.0, 0.0), 'XYZ')
     for x in range(vertex_count):
-        vertpos = float_read(buffer, offset), float_read(buffer, offset+0x4), float_read(buffer, offset+0x8)
-        list.append(vertpos)
+        normal = mathutils.Vector((float_read(buffer, offset), float_read(buffer, offset+0x4), float_read(buffer, offset+0x8)))
+        if z_up: normal.rotate(rotation)
+        list.append(normal)
         offset += 0xC
         if offset >= sector_size:
             return
@@ -341,9 +345,6 @@ def build_mesh(collection, index, filename, mesh_data, striplength, z_up):
     target_mesh = bpy.data.meshes.new(mesh_name)
     created_mesh = bpy.data.objects.new(mesh_name, target_mesh)
     collection.objects.link(created_mesh)
-    
-    if z_up:
-        created_mesh.rotation_euler = (math.radians(90), 0.0, math.radians(180))
     
     for mat_index in mat_list:
         for mat in material_list:
@@ -517,11 +518,11 @@ def amo_read(filedata, filepath, z_up, scale, use_shader_nodes):
                         read_offset += 0x4
                 
                 elif main_sector[0] == "AMO_vertex_coordinates":
-                    get_vert_coords(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_coords, scale)
+                    get_vert_coords(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_coords, scale, z_up)
                     read_offset += main_sector[2]
                 
                 elif main_sector[0] == "AMO_vertex_normals":
-                    get_vert_normals(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_normals)
+                    get_vert_normals(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_normals, z_up)
                     read_offset += main_sector[2]
                 
                 elif main_sector[0] == "AMO_vertex_UVs":

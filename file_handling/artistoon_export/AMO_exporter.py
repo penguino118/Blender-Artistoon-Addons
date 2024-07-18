@@ -1,5 +1,7 @@
 import bpy
+import math
 import bmesh
+import mathutils
 from itertools import groupby
 from ..binary_rw import int16_write, int32_write, float_write, int32_write_list, pad_bytes
 from ..sector_handler import get_sector_size
@@ -207,16 +209,16 @@ def get_indices(object, mesh, face_type):
     
     return out_bytes
   
-def get_vert_coord(mesh, scale):
+def get_vert_coord(mesh, scale, z_up):
     out = []
     vert_count = int32_write(len(mesh.vertices))
+    rotation = mathutils.Euler((math.radians(-90.0), 0.0, 0.0), 'XYZ')
     
     for vert in mesh.vertices:
-        #coord = [vert.co.xyz[0], vert.co.xyz[1], vert.co.xyz[2]]
-        out.append(float_write(vert.co.xyz[0]*scale))
-        out.append(float_write(vert.co.xyz[1]*scale))
-        out.append(float_write(vert.co.xyz[2]*scale))
-        #out.append(x for x in float_write_list(coord))
+        vertex_coord = mathutils.Vector([vert.co.xyz[0], vert.co.xyz[1], vert.co.xyz[2]])
+        if z_up: vertex_coord.rotate(rotation)
+        for coord in vertex_coord:
+            out.append(float_write(coord*scale))
     
     out.insert(0, int32_write(0x00070000))
     out.insert(1, vert_count)
@@ -224,16 +226,16 @@ def get_vert_coord(mesh, scale):
     #out.append(x for x in out)
     return out 
 
-def get_vert_normal(mesh):
+def get_vert_normal(mesh, z_up):
     out = []
     vert_count = int32_write(len(mesh.vertices))
+    rotation = mathutils.Euler((math.radians(-90.0), 0.0, 0.0), 'XYZ')
     
     for vert in mesh.vertices:
-        #vnorm = vert.
-        out.append(float_write(vert.normal[0]))
-        out.append(float_write(vert.normal[1]))
-        out.append(float_write(vert.normal[2]))
-        #out.append(x for x in float_write_list(vnorm))
+        vertex_normal = mathutils.Vector((vert.normal[0], vert.normal[1], vert.normal[2]))
+        if z_up: vertex_normal.rotate(rotation)
+        for normal in vertex_normal:
+            out.append(float_write(normal))
     
     out.insert(0, int32_write(0x00080000))
     out.insert(1, vert_count)
@@ -403,7 +405,7 @@ def uv_split_bmesh(mesh): # GROSS !! ! ! !!
     bm.to_mesh(mesh)
     bm.free()
 
-def get_amo(uv_split, face_type, scale):
+def get_amo(uv_split, face_type, scale, z_up):
     finalbytes = []
     collection = bpy.context.view_layer.active_layer_collection.collection
     mesh_count = len([obj for obj in collection.objects if obj.type == 'MESH'])
@@ -423,8 +425,8 @@ def get_amo(uv_split, face_type, scale):
             if uv_split: uv_split_bmesh(mesh)
             
             mesh_indices   = get_indices(edit_object, mesh, face_type)
-            vertex_coords  = get_vert_coord(mesh, scale)
-            vertex_normals = get_vert_normal(mesh)
+            vertex_coords  = get_vert_coord(mesh, scale, z_up)
+            vertex_normals = get_vert_normal(mesh, z_up)
             vertex_UVs     = get_vert_UVs(mesh)
             vertex_colors  = get_vert_color(mesh)
             vertex_groups  = get_vert_group(edit_object)
@@ -492,9 +494,9 @@ def get_amo(uv_split, face_type, scale):
         
     return mesh_out
 
-def write(context, filepath, uv_split, face_type, scale):
+def write(context, filepath, uv_split, face_type, scale, z_up):
     print("Exporting Artistoon Model...")
-    amo = get_amo(uv_split, face_type, scale)
+    amo = get_amo(uv_split, face_type, scale, z_up)
     f = open(filepath, 'wb')
     for byte in amo:
         f.write(byte)

@@ -75,9 +75,15 @@ class Export_AMO(Operator, ExportHelper):
         default=True,
     )
     
+    z_up: BoolProperty(
+        name="Rotate Up Axis",
+        description="Rotates the object's orientation from Blender's Z up",
+        default=True,
+    )
+    
     def execute(self, context):
         from .file_handling.artistoon_export import AMO_exporter
-        return AMO_exporter.write(context, self.filepath, self.uv_split, self.face_type, self.scale)
+        return AMO_exporter.write(context, self.filepath, self.uv_split, self.face_type, self.scale, self.z_up)
 
 
 # IMPORT #
