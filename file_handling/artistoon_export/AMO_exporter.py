@@ -22,6 +22,8 @@ def get_global_materials(collection):
     mat_sector = []
     tex_sector = []
     
+    material_list = [] # for mesh indices
+    
     for obj in collection.objects:
         if obj.type == 'MESH':
             mesh = obj.data
@@ -68,7 +70,7 @@ def get_global_materials(collection):
         
         mat_sector.append(float_write(mat_unk4_float))
         mat_sector.append(int32_write(mat_unk5_int32))
-        
+        material_list.append(material.name)
         pad_bytes(mat_sector, 0x00, 0xC8)
         mat_sector.append(int32_write(mat_tex_image))
         
@@ -99,9 +101,9 @@ def get_global_materials(collection):
     tex_sector.insert(2, get_sector_size(tex_sector))
     for x in tex_sector:
         out.append(x)
-    return out
+    return out, material_list
 
-def get_indices(object, mesh, face_type):
+def get_indices(object, mesh, all_material_names, face_type):
 
     def write_indices(list, out):
         for poly in list:
@@ -197,7 +199,7 @@ def get_indices(object, mesh, face_type):
     out_bytes.append(int32_write(mat_count))
     out_bytes.append(int32_write(0xC+mat_count*4))
     for mat in mat_list: 
-        mat_index = int(mat.split('_')[-1].split('.')[0][3:]) # gross
+        mat_index = all_material_names.index(mat)
         out_bytes.append(int32_write(mat_index))
     
     #material per strip
@@ -409,7 +411,7 @@ def get_amo(uv_split, face_type, scale, z_up):
     finalbytes = []
     collection = bpy.context.view_layer.active_layer_collection.collection
     mesh_count = len([obj for obj in collection.objects if obj.type == 'MESH'])
-    material_data = get_global_materials(collection)
+    material_data, all_material_names = get_global_materials(collection)
     mesh_out = []
     
     for object in collection.objects:
@@ -424,7 +426,7 @@ def get_amo(uv_split, face_type, scale, z_up):
             triangulate_bmesh(mesh)
             if uv_split: uv_split_bmesh(mesh)
             
-            mesh_indices   = get_indices(edit_object, mesh, face_type)
+            mesh_indices   = get_indices(edit_object, mesh, all_material_names, face_type)
             vertex_coords  = get_vert_coord(mesh, scale, z_up)
             vertex_normals = get_vert_normal(mesh, z_up)
             vertex_UVs     = get_vert_UVs(mesh)
