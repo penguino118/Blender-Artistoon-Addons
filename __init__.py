@@ -155,7 +155,7 @@ class Import_AMO(Operator, ImportHelper):
     )
     
     
-    shader_nodes: BoolProperty(
+    use_shader_nodes: BoolProperty(
         name="Set Up Material Nodes",
         description="Automatically set up shader nodes for certain material types",
         default=False,
@@ -165,7 +165,7 @@ class Import_AMO(Operator, ImportHelper):
     
     def execute(self, context):
         from .file_handling.artistoon_import import AMO_importer
-        return AMO_importer.read(context, self.filepath, self.z_up, self.scale, self.shader_nodes) # self.use_setting
+        return AMO_importer.read(context, self.filepath, self.z_up, self.scale, self.use_shader_nodes) # self.use_setting
 
 ### ###
 

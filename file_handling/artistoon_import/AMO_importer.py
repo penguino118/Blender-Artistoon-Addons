@@ -33,7 +33,7 @@ def print_sector(sector):
         print("invalid sector!! size under 3")
     print(f"Sector Type: {sector[0]}, Data Count: {sector[1]}, Size: {sector[2]}")
 
-def create_material(filename, index, material_type, texture_index, material_list, material_property, shader_nodes):
+def create_material(filename, index, material_type, texture_index, material_list, material_property, use_shader_nodes):
     material_name = f"{filename[:-4]}_mat{index}"
     material = bpy.data.materials.new(material_name) 
     material_list.append(material)
@@ -55,7 +55,7 @@ def create_material(filename, index, material_type, texture_index, material_list
     material['unknown_5'] = unkproperty5
     material['tex_image'] = material_property[index][6]
     
-    if shader_nodes:
+    if use_shader_nodes:
         #bsdf = 
         if nodes.get("Principled BSDF") != None:
             nodes.remove(nodes.get("Principled BSDF"))
@@ -161,7 +161,7 @@ def create_material(filename, index, material_type, texture_index, material_list
             links.new(material_output.inputs['Surface'], imgnode.outputs[0])
     return
 
-def build_materials(collection, filename, buffer, offset, material_start, material_list, shader_nodes):
+def build_materials(collection, filename, buffer, offset, material_start, material_list, use_shader_nodes):
     print("Building materials...")
     offset += material_start
     material_properties = get_sector_header(buffer, offset)
@@ -205,7 +205,7 @@ def build_materials(collection, filename, buffer, offset, material_start, materi
             tex_height = int32_read(buffer, offset+0x14)
             tmp_tex_list.append([tex_index, tex_width, tex_height])
             mat_type = tmp_mat_list[x]
-            create_material(filename, x, mat_type, tex_index, material_list, mat_property, shader_nodes)
+            create_material(filename, x, mat_type, tex_index, material_list, mat_property, use_shader_nodes)
             offset += buf_skip
         for x in range(len(tmp_tex_list)):
             tex_index  = tmp_tex_list[x][0]
@@ -443,7 +443,7 @@ def build_mesh(collection, index, filename, mesh_data, striplength, upflag):
 
     bm.free()
 
-def amo_read(filedata, filepath, upflag, scale, shader_nodes):
+def amo_read(filedata, filepath, upflag, scale, use_shader_nodes):
     filebuffer = filedata
     filename = os.path.basename(filepath)
     sector = get_sector_header(filebuffer, 0x0)
@@ -468,7 +468,7 @@ def amo_read(filedata, filepath, upflag, scale, shader_nodes):
         collection = bpy.data.collections.new(collection_name)
         bpy.context.scene.collection.children.link(collection)
         model_materials = []
-        build_materials(collection, filename, filebuffer, read_offset, model_container[2], model_materials, shader_nodes)
+        build_materials(collection, filename, filebuffer, read_offset, model_container[2], model_materials, use_shader_nodes)
         read_offset += 0xC
         model_count = model_container[1]
         for model_index in range(model_count):
@@ -564,10 +564,10 @@ def amo_read(filedata, filepath, upflag, scale, shader_nodes):
             build_mesh(collection, model_index, filename, mesh_data, tmp_strip_length, upflag)
 
 
-def read(context, filepath, upflag, scale, shader_nodes): #, use_some_setting
+def read(context, filepath, upflag, scale, use_shader_nodes): #, use_some_setting
     print("running read_some_data...")
     f = open(filepath, 'rb')
     data = f.read()
     f.close()
-    amo_read(data, filepath, upflag, scale, shader_nodes)
+    amo_read(data, filepath, upflag, scale, use_shader_nodes)
     return {'FINISHED'}
