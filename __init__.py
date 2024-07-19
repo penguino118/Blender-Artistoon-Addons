@@ -32,10 +32,24 @@ class Export_AHI(Operator, ExportHelper):
         options={'HIDDEN'},
         maxlen=255,  # Max internal buffer length, longer would be clamped.
     )
+    
+    user_scale: FloatProperty(
+        name="Scale",
+        description="Scale by which the objects will be transformed on export",
+        default=10.0,
+        min=0.001,
+        max=1000.0,
+    )
+    
+    z_up: BoolProperty(
+        name="Rotate Up Axis",
+        description="Rotates the object so it faces up in the Z axis",
+        default=True,
+    )
 
     def execute(self, context):
         from .file_handling.artistoon_export import AHI_exporter
-        return AHI_exporter.write(context, self.filepath)
+        return AHI_exporter.write(context, self.filepath, self.z_up, self.user_scale)
 
 class Export_AMO(Operator, ExportHelper):
     """Export selected collection as Artistoon Model data."""
@@ -51,7 +65,7 @@ class Export_AMO(Operator, ExportHelper):
         maxlen=255,  # Max internal buffer length, longer would be clamped.
     )
     
-    scale: FloatProperty(
+    user_scale: FloatProperty(
         name="Scale",
         description="Scale by which the objects will be transformed on export",
         default=10.0,
@@ -83,7 +97,7 @@ class Export_AMO(Operator, ExportHelper):
     
     def execute(self, context):
         from .file_handling.artistoon_export import AMO_exporter
-        return AMO_exporter.write(context, self.filepath, self.uv_split, self.face_type, self.scale, self.z_up)
+        return AMO_exporter.write(context, self.filepath, self.uv_split, self.face_type, self.user_scale, self.z_up)
 
 
 # IMPORT #
@@ -113,11 +127,28 @@ class Import_AHI(Operator, ImportHelper):
 
     # ImportHelper mixin class uses this
     filename_ext = ".ahi/.bin"
+    
+    def get_collections(self, context):
+        collection = bpy.data.collections.get(self.collection)
+        
 
+        if collection != None:
+            for armature in [obj for obj in col.objects if obj.type == 'ARMATURE']:
+                for empty in [obj for obj in armature.children if obj.type == 'EMPTY']:
+                    self.meshes_to_export.add().name = empty.name
+    
     filter_glob: StringProperty(
         default="*.ahi;*.bin",
         options={'HIDDEN'},
         maxlen=255,  # Max internal buffer length, longer would be clamped.
+    )
+    
+    user_scale: FloatProperty(
+        name="Scale",
+        description="Scale by which the object will be transformed",
+        default=0.1,
+        min=0.001,
+        max=1000.0,
     )
     
     z_up: BoolProperty(
@@ -128,7 +159,7 @@ class Import_AHI(Operator, ImportHelper):
 
     def execute(self, context):
         from .file_handling.artistoon_import import AHI_importer
-        return AHI_importer.read(context, self.filepath, self.z_up)
+        return AHI_importer.read(context, self.filepath, self.user_scale, self.z_up)
 
 class Import_AMO(Operator, ImportHelper):
     """Import Artistoon Model data as a new collection."""
@@ -146,7 +177,7 @@ class Import_AMO(Operator, ImportHelper):
 
     # List of operator properties, the attributes will be assigned
     # to the class instance from the operator settings before calling.
-    scale: FloatProperty(
+    user_scale: FloatProperty(
         name="Scale",
         description="Scale by which the objects will be transformed",
         default=0.1,
@@ -171,7 +202,7 @@ class Import_AMO(Operator, ImportHelper):
     
     def execute(self, context):
         from .file_handling.artistoon_import import AMO_importer
-        return AMO_importer.read(context, self.filepath, self.z_up, self.scale, self.use_shader_nodes) # self.use_setting
+        return AMO_importer.read(context, self.filepath, self.z_up, self.user_scale, self.use_shader_nodes) # self.use_setting
 
 ### ###
 

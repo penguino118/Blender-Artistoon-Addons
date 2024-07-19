@@ -41,5 +41,8 @@ def int16_read_signed(buf, offset):
 def int32_read(buf, offset):
     return struct.unpack("<I", buf[offset:offset+4])[0]
 
+def int32_read_signed(buf, offset):
+    return struct.unpack("<i", buf[offset:offset+4])[0]
+
 def float_read(buf, offset):
     return struct.unpack("<f", buf[offset:offset+4])[0]

@@ -191,8 +191,6 @@ def build_materials(collection, filename, buffer, offset, material_start, materi
                 model_type = "Shadeless"
             tmp_mat_list.append(model_type)
             offset += mat_skip
-            #bpy.ops.material.new()
-        #offset += material_properties[2]
     
     texture_properties = get_sector_header(buffer, offset)
     if texture_properties[0] == "AMO_texture_properties":
