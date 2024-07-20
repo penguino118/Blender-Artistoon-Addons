@@ -5,15 +5,12 @@ Auto Modellista meshes should work well, too.
 # Importers
 ## Model Importer (AMO)
 ### To-do
-- [x]  Fix mesh normals operations for newer blender versions
 - [ ]  Managing two+ material lists (collection and meshes) is clunky, maybe use Blender’s internal materials for list
-- [x]  Support Auto Modellista meshes
 - [ ]  Figure out unknown attribute flags
 
 ## Armature Importer (AHI)
 ### To-do
 - [ ]  Figure out unknown attribute flags
-- [ ]  Group bone groups into Blender’s new bone collections
 - [ ]  Reposition model meshes (if already imported) based on bones with translation flag
 
 ## Animation Importer (AAN)
@@ -41,4 +38,3 @@ Auto Modellista meshes should work well, too.
     - Rotation is ocasionally missing for some bones on export, not sure why.
     - st0e0 (Chapter 10-1) is the main example, clouds don’t keep the same rotation on import/export
 - [ ]  Support weird behavior from st0b0 (Pillar object bones)
-- [ ]  Revise bone relationships, use Blender’s system instead of custom properties
