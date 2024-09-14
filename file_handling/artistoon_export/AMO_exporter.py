@@ -407,6 +407,13 @@ def uv_split_bmesh(mesh): # GROSS !! ! ! !!
     bm.to_mesh(mesh)
     bm.free()
 
+def transfer_normals(source, dest):
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.data.objects[dest.name].select_set(True)
+    bpy.context.view_layer.objects.active = source
+    bpy.ops.object.data_transfer(data_type='CUSTOM_NORMAL', loop_mapping='TOPOLOGY')
+    bpy.ops.object.select_all(action='DESELECT')
+
 def get_amo(uv_split, face_type, scale, z_up):
     finalbytes = []
     collection = bpy.context.view_layer.active_layer_collection.collection
@@ -421,10 +428,14 @@ def get_amo(uv_split, face_type, scale, z_up):
             edit_object = object.copy()
             edit_object.data = object.data.copy()
             edit_object.data.calc_loop_triangles()
+            bpy.context.scene.collection.objects.link(edit_object)
             mesh = edit_object.data
             
             triangulate_bmesh(mesh)
-            if uv_split: uv_split_bmesh(mesh)
+            if uv_split:
+                uv_split_bmesh(mesh)
+                transfer_normals(object, edit_object)
+                mesh = edit_object.data
             
             mesh_indices   = get_indices(edit_object, mesh, all_material_names, face_type)
             vertex_coords  = get_vert_coord(mesh, scale, z_up)
