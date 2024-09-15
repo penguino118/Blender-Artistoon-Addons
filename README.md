@@ -6,11 +6,11 @@ Auto Modellista meshes should work well, too.
 ## Model Importer (AMO)
 ### To-do
 - [ ]  Managing two+ material lists (collection and meshes) is clunky, maybe use Blender’s internal materials for list
-- [ ]  Figure out unknown attribute flags
+- [ ]  Figure out usage of unknown attribute flags
 
 ## Armature Importer (AHI)
 ### To-do
-- [ ]  Figure out unknown attribute flags
+- [ ]  Figure out usage of unknown attribute flags
 - [ ]  Reposition model meshes (if already imported) based on bones with translation flag
 
 ## Animation Importer (AAN)
