@@ -245,6 +245,35 @@ def get_vert_normal(mesh, z_up):
     #out.append(x for x in out)
     return out 
 
+def get_loop_normal(mesh, z_up):
+    out = []
+    vert_count = int32_write(len(mesh.vertices))
+    rotation = mathutils.Euler((math.radians(-90.0), 0.0, 0.0), 'XYZ')
+    
+    packed_normals = []
+    for loop in mesh.loops:
+        packed_normals.append([loop.vertex_index, loop.normal])
+
+    vert_normals = []
+    for vert in mesh.vertices:
+        vert_index = vert.index
+        added_verts = []
+        for normal in packed_normals:
+            if normal[0] == vert_index and vert_index not in added_verts:
+                vert_normals.append(mathutils.Vector((normal[1][0], normal[1][1], normal[1][2]))) # this is because its read only or some shit Whatever I just wanna get it woriking man
+                added_verts.append(vert_index)
+
+    for normal in vert_normals:
+        if z_up: normal.rotate(rotation)
+        for direction in normal:
+            out.append(float_write(direction))
+    
+    out.insert(0, int32_write(0x00080000))
+    out.insert(1, vert_count)
+    out.insert(2, get_sector_size(out))
+    #out.append(x for x in out)
+    return out 
+
 def get_vert_UVs(mesh): # GROSS ! ! !
     out = []
     vert_count = int32_write(len(mesh.vertices))
@@ -414,7 +443,7 @@ def transfer_normals(source, dest):
     bpy.ops.object.data_transfer(data_type='CUSTOM_NORMAL', loop_mapping='TOPOLOGY')
     bpy.ops.object.select_all(action='DESELECT')
 
-def get_amo(uv_split, face_type, scale, z_up):
+def get_amo(uv_split, face_type, normal_type, scale, z_up):
     finalbytes = []
     collection = bpy.context.view_layer.active_layer_collection.collection
     mesh_count = len([obj for obj in collection.objects if obj.type == 'MESH'])
@@ -439,8 +468,13 @@ def get_amo(uv_split, face_type, scale, z_up):
             
             mesh_indices   = get_indices(edit_object, mesh, all_material_names, face_type)
             vertex_coords  = get_vert_coord(mesh, scale, z_up)
-            vertex_normals = get_vert_normal(mesh, z_up)
-            vertex_UVs     = get_vert_UVs(mesh)
+            
+            if normal_type == 'LOOP_NORMALS':
+                vertex_normals = get_loop_normal(mesh, z_up)
+            else:
+                vertex_normals = get_vert_normal(mesh, z_up)
+            
+            vertex_UVs =get_vert_UVs(mesh)
             vertex_colors  = get_vert_color(mesh)
             vertex_groups  = get_vert_group(edit_object)
             attributes     = get_attributes(mesh)
@@ -507,9 +541,9 @@ def get_amo(uv_split, face_type, scale, z_up):
         
     return mesh_out
 
-def write(context, filepath, uv_split, face_type, scale, z_up):
+def write(context, filepath, uv_split, face_type, normal_type, scale, z_up):
     print("Exporting Artistoon Model...")
-    amo = get_amo(uv_split, face_type, scale, z_up)
+    amo = get_amo(uv_split, face_type, normal_type, scale, z_up)
     f = open(filepath, 'wb')
     for byte in amo:
         f.write(byte)

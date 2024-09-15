@@ -83,6 +83,22 @@ class Export_AMO(Operator, ExportHelper):
         default='TRI_STRIP',
     )
     
+    normal_type: EnumProperty(
+        name="Normal Export",
+        description="What type of normal data will be exported",
+        items=(
+            ('LOOP_NORMALS', "Loop Normals", "Use normals stored in face loops."),
+            ('VERT_NORMALS', "Vertex Normals", "Use vertex normals, doesn't take into account sharp faces, sharp edges, or custom normal data"),
+        ),
+        default='LOOP_NORMALS',
+    )
+    
+    normal_split: BoolProperty(
+        name="Split Faces by Normals",
+        description="Automatically splits face corners that make vertices have multiple UVs to safely store them per vertex",
+        default=True,
+    )
+    
     uv_split: BoolProperty(
         name="Split Faces by UVs",
         description="Automatically splits face corners that make vertices have multiple UVs to safely store them per vertex",
@@ -97,7 +113,7 @@ class Export_AMO(Operator, ExportHelper):
     
     def execute(self, context):
         from .file_handling.artistoon_export import AMO_exporter
-        return AMO_exporter.write(context, self.filepath, self.uv_split, self.face_type, self.user_scale, self.z_up)
+        return AMO_exporter.write(context, self.filepath, self.uv_split, self.face_type, self.normal_type, self.user_scale, self.z_up)
 
 
 # IMPORT #
