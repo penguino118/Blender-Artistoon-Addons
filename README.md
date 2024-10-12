@@ -5,8 +5,7 @@ Auto Modellista meshes should work well, too.
 # Importers
 ## Model Importer (AMO)
 ### To-do
-- [ ]  Managing two+ material lists (collection and meshes) is clunky, maybe use Blender’s internal materials for list
-- [ ]  Figure out usage of unknown attribute flags
+- [ ]  Figure out usage of unknown mesh attribute flags
 
 ## Armature Importer (AHI)
 ### To-do

@@ -2,6 +2,8 @@ import struct
 
 
 # WRITE #
+def int08_write(int):
+    return struct.pack('<B', int)
 
 def int16_write(int):
     return struct.pack('<H', int)

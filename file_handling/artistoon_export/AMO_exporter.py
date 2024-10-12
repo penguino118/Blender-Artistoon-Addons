@@ -3,132 +3,122 @@ import math
 import bmesh
 import mathutils
 from itertools import groupby
-from ..binary_rw import int16_write, int32_write, float_write, int32_write_list, pad_bytes
+from ..binary_rw import int08_write, int32_write, float_write, int32_write_list, pad_bytes
 from ..sector_handler import get_sector_size
 from ...pyffi.utils import tristrip
 
-def get_global_materials(collection):
+z_up_rotation = mathutils.Euler((math.radians(-90.0), 0.0, 0.0), 'XYZ')
+
+
+def get_all_materials(collection):
     
-    def get_mat_name(material):
-        return material.name
+    def get_material_name(material):
+        return material.name.split('.')[0] # split so duplicate materials are indexed correctly
     
-    def get_tex_index(texture):
-        return texture[3]
-        
-    matlist = []
-    texlist = []
+    def get_texture_properties(material):
+        return {
+        "AMO_TextureIndex" : material.AMO_TextureIndex,
+        "AMO_TextureWidth" : material.AMO_TextureWidth,
+        "AMO_TextureHeight" : material.AMO_TextureHeight }
     
-    out = []
-    mat_sector = []
-    tex_sector = []
+    output_bytes = []
+    material_list_sector_bytes = []
+    texture_list_sector_bytes = []
     
-    material_list = [] # for mesh indices
+    material_name_list = [] # for mesh indices
+    material_list = [] # sorted list of materials from all meshes in the collections
+    texture_list = [] # texture list generated of textures listed by material properties
     
+    print(material_name_list)
+    # collect all materials in the collections
     for obj in collection.objects:
         if obj.type == 'MESH':
             mesh = obj.data
             for material in mesh.materials:
-                if material not in matlist:
-                    matlist.append(material)               
-    matlist = sorted(matlist, key=get_mat_name)
+                if material not in material_list:
+                    # add material's listed texture to texture list
+                    texture_property = get_texture_properties(material)
+                    if texture_property not in texture_list:
+                        texture_list.append(get_texture_properties(material))
+                    # setting the material's texture index to be the index of the texture in the texture list
+                    material.AMO_TextureIndex = texture_list.index(texture_property)
+                    material_list.append(material)
+    print(". material_list={material_list}")
+    material_list = sorted(material_list, key=get_material_name)
     
-    if len(collection.keys()) != 0:
-        for x in range(len(collection.keys())):
-            try:
-                tex_property = collection[f'texture_{x}']
-            except:
-                continue
-            texlist.append([tex_property[0], tex_property[1], tex_property[2], x])
-    else:
-        return
+    # writing output bytes of material list 
+    for material in material_list:
+        material_name_list.append(material.name)
 
-    texlist = sorted(texlist, key=get_tex_index)
+        material_list_sector_bytes.append(int32_write(material.AMO_MaterialType)) # head
+        material_list_sector_bytes.append(int32_write(1)) # count
+        material_list_sector_bytes.append(int32_write(0x110)) # size
+        
+        for float in material.AMO_ColorUnk1:
+            material_list_sector_bytes.append(float_write(float))
+        for float in material.AMO_ColorUnk2:
+            material_list_sector_bytes.append(float_write(float))
+        for float in material.AMO_ColorUnk3:
+            material_list_sector_bytes.append(float_write(float))
+        
+        material_list_sector_bytes.append(float_write(material.AMO_Unknown4))
+        material_list_sector_bytes.append(int32_write(material.AMO_Unknown5))
+        pad_bytes(material_list_sector_bytes, 0x00, 0xC8)
+        material_list_sector_bytes.append(int32_write(material.AMO_TextureIndex))
     
-    for x in range(len(matlist)):
-        material = matlist[x]
-        mat_type       = material['mat_type']
-        mat_tex_image  = material['tex_image']
-        mat_unk1       = material['unknown_1']
-        mat_unk2       = material['unknown_2']
-        mat_unk3       = material['unknown_3']
-        mat_unk4_float = material['unknown_4']
-        mat_unk5_int32 = material['unknown_5']
-        
-        mat_sector.append(int32_write(mat_type)) #head
-        mat_sector.append(int32_write(1)) #count
-        mat_sector.append(int32_write(0x110)) #size
-        
-        for unk in mat_unk1:
-            mat_sector.append(float_write(unk))
-        for unk in mat_unk2:
-            mat_sector.append(float_write(unk))
-        for unk in mat_unk3:
-            mat_sector.append(float_write(unk))
-#        mat_sector.append(float_write_list(mat_unk1))
-#        mat_sector.append(float_write_list(mat_unk2))
-#        mat_sector.append(float_write_list(mat_unk3))
-        
-        mat_sector.append(float_write(mat_unk4_float))
-        mat_sector.append(int32_write(mat_unk5_int32))
-        material_list.append(material.name)
-        pad_bytes(mat_sector, 0x00, 0xC8)
-        mat_sector.append(int32_write(mat_tex_image))
-        
-    mat_sector.insert(0, int32_write(0x00000009))
-    mat_sector.insert(1, int32_write(len(matlist)))
-    mat_sector.insert(2, get_sector_size(mat_sector))
+    # sector header
+    material_list_sector_bytes.insert(0, int32_write(0x00000009)) # head
+    material_list_sector_bytes.insert(1, int32_write(len(material_list))) # count
+    material_list_sector_bytes.insert(2, get_sector_size(material_list_sector_bytes)) # size
     
-    for x in mat_sector:
-        out.append(x)
+    # writing output bytes of texture list 
+    for texture in texture_list:
+        texture_list_sector_bytes.append(int32_write(0)) # texture entry head
+        texture_list_sector_bytes.append(int32_write(1)) # count
+        texture_list_sector_bytes.append(int32_write(0x10C)) # size
+
+        texture_list_sector_bytes.append(int32_write(texture["AMO_TextureIndex"]))
+        texture_list_sector_bytes.append(int32_write(texture["AMO_TextureWidth"]))
+        texture_list_sector_bytes.append(int32_write(texture["AMO_TextureHeight"]))
+        pad_bytes(texture_list_sector_bytes, 0x00, 0xF4)
     
-    for x in range(len(texlist)):
-        tex_index  = texlist[x][0]
-        tex_width  = texlist[x][1]
-        tex_height = texlist[x][2]
-        
-        tex_sector.append(int32_write(0))
-        tex_sector.append(int32_write(1))
-        tex_sector.append(int32_write(0x10C))
-        
-        tex_sector.append(int32_write(tex_index))
-        tex_sector.append(int32_write(tex_width))
-        tex_sector.append(int32_write(tex_height))
-        
-        pad_bytes(tex_sector, 0x00, 0xF4)
+    # sector header
+    texture_list_sector_bytes.insert(0, int32_write(0x0000000A)) # head
+    texture_list_sector_bytes.insert(1, int32_write(len(texture_list))) # count
+    texture_list_sector_bytes.insert(2, get_sector_size(texture_list_sector_bytes)) # size
     
-    tex_sector.insert(0, int32_write(0x0000000A))
-    tex_sector.insert(1, int32_write(len(texlist)))
-    tex_sector.insert(2, get_sector_size(tex_sector))
-    for x in tex_sector:
-        out.append(x)
-    return out, material_list
+    for byte in material_list_sector_bytes:
+        output_bytes.append(byte)
+    for byte in texture_list_sector_bytes:
+        output_bytes.append(byte)
+    return output_bytes, material_name_list
+
 
 def get_indices(object, mesh, all_material_names, face_type):
 
-    def write_indices(list, out):
+    def write_indices(output_bytes, list):
         for poly in list:
             size = len(poly)
-            out.append(int32_write(size))
+            output_bytes.append(int32_write(size))
             for vert in poly:
-                out.append(int32_write(vert))
+                output_bytes.append(int32_write(vert))
 
-    def write_materials(facemats, matlist, out):
-        for face_mat in facemats:
-            for mat in mat_list:
-                if face_mat == mat:
-                    out.append(int32_write(mat_list.index(mat)))
+    def write_materials(face_material_index_list, mesh_material_list, output_bytes):
+        for face_material in face_material_index_list:
+            for material in mesh_material_list:
+                if face_material == material:
+                    output_bytes.append(int32_write(mesh_material_list.index(material)))
 
-    def add_face(split_faces, material_name, poly_verts):
-        if material_name in split_faces:
-            split_faces[material_name].append(poly_verts)
+    def add_face(split_faces_list, material_name, poly_verts):
+        if material_name in split_faces_list:
+            split_faces_list[material_name].append(poly_verts)
         else:
-            split_faces[material_name] = [poly_verts]
+            split_faces_list[material_name] = [poly_verts]
     
     def collect_indices(faces, face_type):
         collected_indices = []
         collected_materials = []
         for material, indices in faces: #split_03_faces.items()
-            print(indices)
             if face_type == 'TRI_STRIP': indices = tristrip.stripify(indices)
             for index in indices:
                 collected_indices.append(index)
@@ -136,9 +126,9 @@ def get_indices(object, mesh, all_material_names, face_type):
         return collected_indices, collected_materials
         
     
-    out_bytes = []
+    output_bytes = []
     complex_verts = []
-    mat_list = []
+    mesh_material_list = []
 
     # giogio stores faces with two or more weight groups on a separate list (04 instead of 03)
     for vert in mesh.vertices: #gather indices for type 04 list
@@ -152,14 +142,16 @@ def get_indices(object, mesh, all_material_names, face_type):
 
     split_03_faces = {} # 03 faces split by material
     split_04_faces = {} # 04 faces split by material
-
+    print(f"\n\n\nmaterialnamelist: {all_material_names}\n")
     for poly in mesh.polygons:
         poly_verts = list(poly.vertices)
         
-        # add materials to mat list
+        # add materials to material name list
         material_name = mesh.materials[poly.material_index].name
-        if material_name not in mat_list:
-            mat_list.append(material_name)
+        print(f"{material_name}, ", end = '')
+        if material_name not in mesh_material_list:
+            print(f"\n - UNIQUE material_name: {material_name}")
+            mesh_material_list.append(material_name)
         
         # add faces
         if any(vert in complex_verts for vert in poly_verts): # checking if there's any 04 type verts
@@ -172,83 +164,81 @@ def get_indices(object, mesh, all_material_names, face_type):
     indices_04, materials_04 = collect_indices(split_04_faces.items(), face_type) 
 
     # add strips to binary
-    write_indices(indices_03, out_bytes)
-    out_bytes.insert(0, int32_write(0x00030000)) # magic
-    out_bytes.insert(1, int32_write(len(indices_03))) # count
-    out_bytes.insert(2, get_sector_size(out_bytes)) # size
+    write_indices(output_bytes, indices_03)
+    output_bytes.insert(0, int32_write(0x00030000)) # head
+    output_bytes.insert(1, int32_write(len(indices_03))) # count
+    output_bytes.insert(2, get_sector_size(output_bytes)) # size
     if len(indices_04) != 0:
-        out04 = []
-        write_indices(indices_04, out04)
-        out04.insert(0, int32_write(0x00040000)) # magic 
-        out04.insert(1, int32_write(len(indices_04))) # count
-        out04.insert(2, get_sector_size(out04)) # size
-        for l in out04:
-            out_bytes.append(l)
+        strip04_bytes = []
+        write_indices(strip04_bytes, indices_04)
+        strip04_bytes.insert(0, int32_write(0x00040000)) # head 
+        strip04_bytes.insert(1, int32_write(len(indices_04))) # count
+        strip04_bytes.insert(2, get_sector_size(strip04_bytes)) # size
+        for l in strip04_bytes:
+            output_bytes.append(l)
     
-    #strip container
-    out_bytes.insert(0, int32_write(0x00000005)) # magic 
-    if len(indices_04) != 0: out_bytes.insert(1, int32_write(2)) # count = 2 if 04 strips exist (there's two strip sectors)
-    else: out_bytes.insert(1, int32_write(1)) # count = 1 if only 03 strips exist
-    out_bytes.insert(2, get_sector_size(out_bytes)) # size
+    # strip container
+    output_bytes.insert(0, int32_write(0x00000005)) # head 
+    if len(indices_04) != 0: output_bytes.insert(1, int32_write(2)) # count = 2 if 04 strips exist (mean there's two strip sectors)
+    else: output_bytes.insert(1, int32_write(1)) # count = 1 if only 03 strips exist
+    output_bytes.insert(2, get_sector_size(output_bytes)) # size of all strips thus far
     
-    total_strips = len(indices_03) + len(indices_04)
+    total_strip_count = len(indices_03) + len(indices_04)
     
-    #material list container
-    mat_count = len(mat_list)
-    out_bytes.append(int32_write(0x00050000))
-    out_bytes.append(int32_write(mat_count))
-    out_bytes.append(int32_write(0xC+mat_count*4))
-    for mat in mat_list: 
-        mat_index = all_material_names.index(mat)
-        out_bytes.append(int32_write(mat_index))
+    # mesh material list 
+    material_count = len(mesh_material_list)
+    output_bytes.append(int32_write(0x00050000))
+    output_bytes.append(int32_write(material_count))
+    output_bytes.append(int32_write(0xC+material_count*4))
+    for material in mesh_material_list: 
+        material_index = all_material_names.index(material)
+        output_bytes.append(int32_write(material_index))
     
-    #material per strip
-    out_bytes.append(int32_write(0x00060000)) # magic
-    out_bytes.append(int32_write(total_strips)) # count
-    out_bytes.append(int32_write(0xC+total_strips*4)) # size 
-    write_materials(materials_03, mat_list, out_bytes)
-    write_materials(materials_04, mat_list, out_bytes)
+    # material per strip
+    output_bytes.append(int32_write(0x00060000)) # head
+    output_bytes.append(int32_write(total_strip_count)) # count
+    output_bytes.append(int32_write(0xC+total_strip_count*4)) # size 
+    write_materials(materials_03, mesh_material_list, output_bytes)
+    write_materials(materials_04, mesh_material_list, output_bytes)
     
-    return out_bytes
-  
-def get_vert_coord(mesh, scale, z_up):
-    out = []
-    vert_count = int32_write(len(mesh.vertices))
-    rotation = mathutils.Euler((math.radians(-90.0), 0.0, 0.0), 'XYZ')
-    
+    return output_bytes
+
+
+def get_vert_coord(mesh, scale, use_z_up):
+    output_bytes = []
+    vertex_count = int32_write(len(mesh.vertices))
+
     for vert in mesh.vertices:
         vertex_coord = mathutils.Vector([vert.co.xyz[0], vert.co.xyz[1], vert.co.xyz[2]])
-        if z_up: vertex_coord.rotate(rotation)
+        if use_z_up: vertex_coord.rotate(z_up_rotation)
         for coord in vertex_coord:
-            out.append(float_write(coord*scale))
+            output_bytes.append(float_write(coord*scale))
     
-    out.insert(0, int32_write(0x00070000))
-    out.insert(1, vert_count)
-    out.insert(2, get_sector_size(out))
-    #out.append(x for x in out)
-    return out 
+    output_bytes.insert(0, int32_write(0x00070000)) # head
+    output_bytes.insert(1, vertex_count) # count
+    output_bytes.insert(2, get_sector_size(output_bytes)) # size
+    return output_bytes 
 
-def get_vert_normal(mesh, z_up):
-    out = []
-    vert_count = int32_write(len(mesh.vertices))
-    rotation = mathutils.Euler((math.radians(-90.0), 0.0, 0.0), 'XYZ')
+
+def get_vert_normal(mesh, use_z_up):
+    output_bytes = []
+    vertex_count = int32_write(len(mesh.vertices))
     
     for vert in mesh.vertices:
         vertex_normal = mathutils.Vector((vert.normal[0], vert.normal[1], vert.normal[2]))
-        if z_up: vertex_normal.rotate(rotation)
+        if use_z_up: vertex_normal.rotate(z_up_rotation)
         for normal in vertex_normal:
-            out.append(float_write(normal))
+            output_bytes.append(float_write(normal))
     
-    out.insert(0, int32_write(0x00080000))
-    out.insert(1, vert_count)
-    out.insert(2, get_sector_size(out))
-    #out.append(x for x in out)
-    return out 
+    output_bytes.insert(0, int32_write(0x00080000)) # head
+    output_bytes.insert(1, vertex_count) # count
+    output_bytes.insert(2, get_sector_size(output_bytes)) # size
+    return output_bytes 
 
-def get_loop_normal(mesh, z_up):
-    out = []
-    vert_count = int32_write(len(mesh.vertices))
-    rotation = mathutils.Euler((math.radians(-90.0), 0.0, 0.0), 'XYZ')
+
+def get_loop_normal(mesh, use_z_up):
+    output_bytes = []
+    vertex_count = int32_write(len(mesh.vertices))
     
     packed_normals = []
     for loop in mesh.loops:
@@ -264,19 +254,19 @@ def get_loop_normal(mesh, z_up):
                 added_verts.append(vert_index)
 
     for normal in vert_normals:
-        if z_up: normal.rotate(rotation)
+        if use_z_up: normal.rotate(z_up_rotation)
         for direction in normal:
-            out.append(float_write(direction))
+            output_bytes.append(float_write(direction))
     
-    out.insert(0, int32_write(0x00080000))
-    out.insert(1, vert_count)
-    out.insert(2, get_sector_size(out))
-    #out.append(x for x in out)
-    return out 
+    output_bytes.insert(0, int32_write(0x00080000)) # head
+    output_bytes.insert(1, vertex_count) # count
+    output_bytes.insert(2, get_sector_size(output_bytes)) # size
+    return output_bytes 
 
-def get_vert_UVs(mesh): # GROSS ! ! !
-    out = []
-    vert_count = int32_write(len(mesh.vertices))
+
+def get_vert_UVs(mesh): # todo: GROSS ! ! !
+    output_bytes = []
+    vertex_count = int32_write(len(mesh.vertices))
     
     tmpuv = []
     for face in mesh.polygons:
@@ -289,114 +279,111 @@ def get_vert_UVs(mesh): # GROSS ! ! !
         added_verts = []
         for uv in tmpuv:
             if uv[0] == vert_index and vert_index not in added_verts:
-                out.append(float_write(uv[1][0]))
-                out.append(float_write(1.0 - uv[1][1]))
+                output_bytes.append(float_write(uv[1][0]))
+                output_bytes.append(float_write(1.0 - uv[1][1]))
                 added_verts.append(vert_index)
                 
-    out.insert(0, int32_write(0x000A0000))
-    out.insert(1, vert_count)
-    out.insert(2, get_sector_size(out))
-    #out.append(x for x in out)
-    return out 
+    output_bytes.insert(0, int32_write(0x000A0000)) # head
+    output_bytes.insert(1, vertex_count) # count
+    output_bytes.insert(2, get_sector_size(output_bytes)) # size
+    return output_bytes 
+
 
 def get_vert_color(mesh):
-    out = []
-    vert_count = int32_write(len(mesh.vertices))
+    output_bytes = []
+    vertex_count = int32_write(len(mesh.vertices))
     color_attribute = mesh.color_attributes.active_color
+    
     if color_attribute != None:
-        for c in color_attribute.data:
-            R = c.color[0] * 255
-            G = c.color[1] * 255
-            B = c.color[2] * 255
-            A = c.color[3] * 255
-            out.append(float_write(R))
-            out.append(float_write(G))
-            out.append(float_write(B))
-            out.append(float_write(A))
-    out.insert(0, int32_write(0x000B0000))
-    out.insert(1, vert_count)
-    out.insert(2, get_sector_size(out))
-    #out.append(x for x in out)
-    return out
+        for vertex_color in color_attribute.data:
+            red   = vertex_color.color[0] * 255
+            green = vertex_color.color[1] * 255
+            blue  = vertex_color.color[2] * 255
+            alpha = vertex_color.color[3] * 255
+            output_bytes.append(float_write(red))
+            output_bytes.append(float_write(green))
+            output_bytes.append(float_write(blue))
+            output_bytes.append(float_write(alpha))
+    
+    output_bytes.insert(0, int32_write(0x000B0000)) # head
+    output_bytes.insert(1, vertex_count) # count
+    output_bytes.insert(2, get_sector_size(output_bytes)) # size
+    return output_bytes
+
 
 def get_vert_group(object):
-    out = []
+    output_bytes = []
     mesh = object.data
-    vert_count = int32_write(len(mesh.vertices))
+    vertex_count = int32_write(len(mesh.vertices))
+    
     if len(object.vertex_groups) > 0:
+        
         for vert in mesh.vertices:
-            vert_group = []
+            vertex_group_data = []
             for group in vert.groups:
-                group_name = object.vertex_groups[group.group].name
-                group_weight = group.weight
-                vert_group.append([group_name, group_weight])
-            out.append(int32_write(len(vert_group)))
-            for x in vert_group:
-                out.append(int32_write(int(x[0])))
-                out.append(float_write(x[1]*100))
-        out.insert(0, int32_write(0x000C0000))
-        out.insert(1, vert_count)
-        out.insert(2, get_sector_size(out))
-        #out.append(x for x in out)
-    return out
+                group_name = object.vertex_groups[group.group].name 
+                group_weight = group.weight * 100 # model format weights are in the range 0 - 100
+                vertex_group_data.append({
+                    "name" : int(group_name), # todo: relying on bone name being an int is GROSS.
+                    "weight" : group_weight
+                    })
+            
+            output_bytes.append(int32_write(len(vertex_group_data))) # count of how many groups influence the current vertex
+            for group in vertex_group_data:
+                output_bytes.append(int32_write(group["name"]))
+                output_bytes.append(float_write(group["weight"]))
+        
+        output_bytes.insert(0, int32_write(0x000C0000)) # head
+        output_bytes.insert(1, vertex_count) # count
+        output_bytes.insert(2, get_sector_size(output_bytes))# size
+    return output_bytes
+
 
 def get_attributes(mesh):
-    out = []
-    if len(mesh.keys()) != 0:
-        attributes = [
-            mesh.get('aa_render_dist'),
-            mesh.get('aa_material'),
-            mesh.get('aa_unknown_0x02'),
-            mesh.get('aa_cull'),
-            mesh.get('aa_scissor'),
-            mesh.get('aa_light'),
-            mesh.get('aa_unknown_0x06'),
-            mesh.get('aa_uvscroll'),
-            mesh.get('aa_unknown_0x08'),
-            mesh.get('aa_fadecolor'),
-            mesh.get('aa_special'),
-            mesh.get('aa_unknown_0x0B'),
-            mesh.get('aa_unknown_0x0C'),
-            mesh.get('aa_unknown_0x0D'),
-            mesh.get('aa_unknown_0x0E'),
-            mesh.get('aa_unknown_0x0F'),
-            mesh.get('aa_unknown_0x10'),
-            mesh.get('aa_unknown_0x11')
-            ]
-        if None in attributes:
-            return ""
-        else:
-            for x in int32_write_list(attributes):
-                out.append(x)
-            out.insert(0, int32_write(0x000F0000))
-            out.insert(1, int32_write(1))
-            out.insert(2, get_sector_size(out))
-            #out.append(x for x in out)
-            return out
-    else:
-        return
+    output_bytes = []
 
-def get_bounding(mesh):
-    out = []
-    if len(mesh.keys()) != 0:
-        bound = []
-        for x in mesh.keys():
-            if x.split('_')[0] == 'bounding':
-                bound.append(x)
-        if len(bound) != 0:
-            for x in range(len(bound)):
-                unk1 = list(mesh.get(f'bounding_{x}_unk1'))
-                cull_range = list(mesh.get(f'culling_range'))
-                for short in unk1:
-                    out.append(int16_write(short))   
-                for float in cull_range:
-                    out.append(float_write(float))
-            out.insert(0, int32_write(0x00110000)) 
-            out.insert(1, int32_write(len(bound)))
-            out.insert(2, get_sector_size(out))
-        return out
-    else:
-        return
+    attributes = [
+        mesh.AMO_RenderDistance,
+        mesh.AMO_Unknown_0x10,
+        mesh.AMO_Unknown_0x14,
+        mesh.AMO_Culling,
+        mesh.AMO_Scissor,
+        mesh.AMO_Light,
+        mesh.AMO_Unknown_0x24,
+        mesh.AMO_UVScroll,
+        mesh.AMO_Unknown_0x2C,
+        mesh.AMO_FadeColor,
+        mesh.AMO_Special,
+        mesh.AMO_Unknown_0x38,
+        mesh.AMO_Unknown_0x3C,
+        mesh.AMO_Unknown_0x40,
+        mesh.AMO_Unknown_0x44,
+        mesh.AMO_Unknown_0x48,
+        mesh.AMO_Unknown_0x4C,
+        mesh.AMO_Unknown_0x50]
+
+    for byte in int32_write_list(attributes):
+        output_bytes.append(byte)
+    
+    output_bytes.insert(0, int32_write(0x000F0000)) # head
+    output_bytes.insert(1, int32_write(1)) # count
+    output_bytes.insert(2, get_sector_size(output_bytes)) # size
+    return output_bytes
+
+
+def get_bounding(mesh, scale):
+    if mesh.AMO_HasBounding == False: return ()
+    
+    output_bytes = []
+    
+    for float in mesh.AMO_Bounding:
+        output_bytes.append(float_write(float*scale))
+    output_bytes.insert(0, int32_write(0x00110000)) # size
+    output_bytes.insert(1, int32_write(1)) # count
+    output_bytes.insert(2, get_sector_size(output_bytes)) # head
+
+    return output_bytes
+
 
 def triangulate_bmesh(mesh):
     bm = bmesh.new()
@@ -405,7 +392,8 @@ def triangulate_bmesh(mesh):
     bm.to_mesh(mesh)
     bm.free()
 
-def uv_split_bmesh(mesh): # GROSS !! ! ! !! 
+
+def uv_split_bmesh(mesh): # todo: GROSS !! ! ! !! 
     bm = bmesh.new()
     bm.from_mesh(mesh)
     
@@ -414,7 +402,6 @@ def uv_split_bmesh(mesh): # GROSS !! ! ! !!
         for vertindex, loopindex in zip(face.vertices, face.loop_indices):
             uv_coords = mesh.uv_layers.active.data[loopindex].uv
             packed_uv.append([vertindex, uv_coords])
-
 
     edges_to_split = []
 
@@ -436,25 +423,25 @@ def uv_split_bmesh(mesh): # GROSS !! ! ! !!
     bm.to_mesh(mesh)
     bm.free()
 
+
 def transfer_normals(source, dest):
     bpy.ops.object.select_all(action='DESELECT')
     bpy.data.objects[dest.name].select_set(True)
     bpy.context.view_layer.objects.active = source
-    bpy.ops.object.data_transfer(data_type='CUSTOM_NORMAL', loop_mapping='TOPOLOGY')
+    bpy.ops.object.data_transfer(data_type='CUSTOM_NORMAL', loop_mapping='POLYINTERP_NEAREST')
     bpy.ops.object.select_all(action='DESELECT')
 
-def get_amo(uv_split, face_type, normal_type, scale, z_up):
-    finalbytes = []
-    collection = bpy.context.view_layer.active_layer_collection.collection
+
+def get_amo(collection, uv_split, face_type, normal_type, scale, use_z_up):
+    output_bytes = []
+    material_texture_bytes, all_material_names = get_all_materials(collection)
     mesh_count = len([obj for obj in collection.objects if obj.type == 'MESH'])
-    material_data, all_material_names = get_global_materials(collection)
-    mesh_out = []
     
     for object in collection.objects:
         if object.type == 'MESH':
-            out = []
+            mesh_data_bytes = []
             
-            edit_object = object.copy()
+            edit_object = object.copy() # edit mesh where we will triangulate / uv split
             edit_object.data = object.data.copy()
             edit_object.data.calc_loop_triangles()
             bpy.context.scene.collection.objects.link(edit_object)
@@ -467,88 +454,97 @@ def get_amo(uv_split, face_type, normal_type, scale, z_up):
                 mesh = edit_object.data
             
             mesh_indices   = get_indices(edit_object, mesh, all_material_names, face_type)
-            vertex_coords  = get_vert_coord(mesh, scale, z_up)
+            vertex_coords  = get_vert_coord(mesh, scale, use_z_up)
             
             if normal_type == 'LOOP_NORMALS':
-                vertex_normals = get_loop_normal(mesh, z_up)
+                vertex_normals = get_loop_normal(mesh, use_z_up)
             else:
-                vertex_normals = get_vert_normal(mesh, z_up)
+                vertex_normals = get_vert_normal(mesh, use_z_up)
             
-            vertex_UVs =get_vert_UVs(mesh)
+            vertex_UVs     = get_vert_UVs(mesh)
             vertex_colors  = get_vert_color(mesh)
             vertex_groups  = get_vert_group(edit_object)
             attributes     = get_attributes(mesh)
-            bounding       = get_bounding(mesh)
+            bounding       = get_bounding(mesh, scale)
             
-            bpy.data.objects.remove(edit_object)
+            bpy.data.objects.remove(edit_object) # remove edit mesh
             
             sector_count = 0
             if len(mesh_indices) != 0:
                 sector_count += 3
                 for byte in mesh_indices:
-                    out.append(byte)
-                
+                    mesh_data_bytes.append(byte)
+
             if len(vertex_coords) != 0:
                 for byte in vertex_coords:
-                    out.append(byte)
-                sector_count += 1
-            if len(vertex_normals) != 0:
-                for byte in vertex_normals:
-                    out.append(byte)
-                sector_count += 1
-            if len(vertex_UVs) != 0:
-                for byte in vertex_UVs:
-                    out.append(byte)
-                sector_count += 1
-            if len(vertex_colors) != 0:
-                for byte in vertex_colors:
-                    out.append(byte)
-                sector_count += 1
-            if len(vertex_groups) != 0:
-                for byte in vertex_groups:
-                    out.append(byte)
-                sector_count += 1
-            if len(attributes) != 0:
-                for byte in attributes:
-                    out.append(byte)
-                sector_count += 1
-            if len(bounding) != 0:
-                for byte in bounding:
-                    out.append(byte)
+                    mesh_data_bytes.append(byte)
                 sector_count += 1
             
-            out.insert(0, int32_write(0x00000004))
-            out.insert(1, int32_write(sector_count))
-            out.insert(2, get_sector_size(out))
-            for byte in out:
-                mesh_out.append(byte)
+            if len(vertex_normals) != 0:
+                for byte in vertex_normals:
+                    mesh_data_bytes.append(byte)
+                sector_count += 1
+            
+            if len(vertex_UVs) != 0:
+                for byte in vertex_UVs:
+                    mesh_data_bytes.append(byte)
+                sector_count += 1
+            
+            if len(vertex_colors) != 0:
+                for byte in vertex_colors:
+                    mesh_data_bytes.append(byte)
+                sector_count += 1
+            
+            if len(vertex_groups) != 0:
+                for byte in vertex_groups:
+                    mesh_data_bytes.append(byte)
+                sector_count += 1
+            
+            if len(attributes) != 0:
+                for byte in attributes:
+                    mesh_data_bytes.append(byte)
+                sector_count += 1
+            
+            if len(bounding) != 0:
+                for byte in bounding:
+                    mesh_data_bytes.append(byte)
+                sector_count += 1
+            
+            mesh_data_bytes.insert(0, int32_write(0x00000004)) # model: mesh data container
+            mesh_data_bytes.insert(1, int32_write(sector_count))
+            mesh_data_bytes.insert(2, get_sector_size(mesh_data_bytes))
+            for byte in mesh_data_bytes:
+                output_bytes.append(byte)
     
-    mesh_out.insert(0, int32_write(0x00000002))
-    mesh_out.insert(1, int32_write(mesh_count))
-    mesh_out.insert(2, get_sector_size(mesh_out))
+    output_bytes.insert(0, int32_write(0x00000002)) # model container
+    output_bytes.insert(1, int32_write(mesh_count))
+    output_bytes.insert(2, get_sector_size(output_bytes))
     
-    for byte in material_data:
-        mesh_out.append(byte)
+    for byte in material_texture_bytes:
+        output_bytes.append(byte)
     
-    mesh_out.insert(0, int32_write(0x00020000)) 
-    mesh_out.insert(1, int32_write(1))
-    mesh_out.insert(2, int32_write(0x10))
-    mesh_out.insert(3, int32_write(0x10B0900)) #unknown
+    output_bytes.insert(0, int32_write(0x00020000)) 
+    output_bytes.insert(1, int32_write(1))
+    output_bytes.insert(2, int32_write(0x10))
+    output_bytes.insert(3, int32_write(0x10B0900)) #unknown
     
-    mesh_out.insert(0, int32_write(0x00000001))
-    mesh_out.insert(1, int32_write(0x00000004))
-    mesh_out.insert(2, get_sector_size(mesh_out))
+    output_bytes.insert(0, int32_write(0x00000001))
+    output_bytes.insert(1, int32_write(0x00000004))
+    output_bytes.insert(2, get_sector_size(output_bytes))
         
-    return mesh_out
+    return output_bytes
 
-def write(context, filepath, uv_split, face_type, normal_type, scale, z_up):
+
+def write(context, filepath, uv_split, face_type, normal_type, scale, use_z_up):
     print("Exporting Artistoon Model...")
-    amo = get_amo(uv_split, face_type, normal_type, scale, z_up)
-    f = open(filepath, 'wb')
-    for byte in amo:
-        f.write(byte)
-    f.close()
+    collection = bpy.context.view_layer.active_layer_collection.collection
+    amo_bytes = get_amo(collection, uv_split, face_type, normal_type, scale, use_z_up)
+    output_file = open(filepath, 'wb')
+    for byte in amo_bytes:
+        output_file.write(byte)
+    output_file.close()
     return {'FINISHED'}
+
 
 def all_equal(iterable):
     g = groupby(iterable)

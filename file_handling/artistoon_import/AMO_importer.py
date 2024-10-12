@@ -6,14 +6,6 @@ import mathutils
 from ..sector_handler import AMO_sector_dict as sector_type_dict
 from ..binary_rw import int16_read, int32_read, float_read
 
-
-model_type_dict = { # where are materials 2 and 4 ? Also this doesnt really matter that much ingame huh Lol.
-    0x00000000 : "VFX",       #eff00.pzz meshes
-    0x00000001 : "CelShaded",
-    0x00000003 : "Shadeless", #used on transparent meshes
-    0x00000005 : "Static"     #loading screens, stage objects, etc
-    }
-
 def get_sector_type(buffer, offset):
     head = int32_read(buffer, offset)
     #print(head)
@@ -22,204 +14,118 @@ def get_sector_type(buffer, offset):
     else:
         return f"unsupported sector : {head} at offset {offset}"
 
+
 def get_sector_header(buffer, offset):
     head = get_sector_type(buffer, offset)
     count = int32_read(buffer, offset+4)
     size = int32_read(buffer, offset+8)
     return [head, count, size]
 
+
 def print_sector(sector):
     if len(sector) < 3:
         print("invalid sector!! size under 3")
     print(f"Sector Type: {sector[0]}, Data Count: {sector[1]}, Size: {sector[2]}")
 
-def create_material(filename, index, material_type, texture_index, material_list, material_property, use_shader_nodes):
-    material_name = f"{filename[:-4]}_mat{index}"
-    material = bpy.data.materials.new(material_name) 
-    material_list.append(material)
-    material.use_nodes = True
-    nodes = material.node_tree.nodes
-    
-    print(material_property)
-    unkproperty1 = material_property[index][1]
-    unkproperty2 = material_property[index][2]
-    unkproperty3 = material_property[index][3]
-    unkproperty4 = material_property[index][4]
-    unkproperty5 = material_property[index][5]
-    
-    material['mat_type'] = material_property[index][0]
-    material['unknown_1'] = unkproperty1
-    material['unknown_2'] = unkproperty2
-    material['unknown_3'] = unkproperty3
-    material['unknown_4'] = unkproperty4
-    material['unknown_5'] = unkproperty5
-    material['tex_image'] = material_property[index][6]
-    
-    if use_shader_nodes:
-        #bsdf = 
-        if nodes.get("Principled BSDF") != None:
-            nodes.remove(nodes.get("Principled BSDF"))
-        
-        #material_output = nodes.get("ShaderNodeOutputMaterial")
-        #print(material_output)
-        material_output = nodes.get("Material Output") 
-        imgnode = nodes.new('ShaderNodeTexImage')
-        imgnode.image = bpy.data.images.get(f"{filename[:-4]}_tex{texture_index}")
-        
-        links = material.node_tree.links
-        
-        #print(imgnode.inputs)
-        #print(nodes.get("Mix"))
-        if material_type == "CelShaded":
-            diffuse = nodes.new('ShaderNodeBsdfDiffuse')
-            specular = nodes.new('ShaderNodeBsdfDiffuse')
-            
-            difframpnode = nodes.new('ShaderNodeValToRGB')
-            specrampnode = nodes.new('ShaderNodeValToRGB')
-            
-            difftorgbnode = nodes.new('ShaderNodeShaderToRGB')
-            spectorgbnode = nodes.new('ShaderNodeShaderToRGB')
-            
-            multcolmixnode = nodes.new('ShaderNodeMixRGB')
-            multdifmixnode = nodes.new('ShaderNodeMixRGB')
-            screenmixnode = nodes.new('ShaderNodeMixRGB')
-            
-            colnode = nodes.new('ShaderNodeVertexColor')
-            
-            #diffuse color ramp
-            #[0] - 0.00 - #CECECE
-            #[1] - 0.38 - #BABABA
-            #[2] - 0.50 - #FFFFFF
-            #[3] - 1.00 - #FFFFFF
-            
-            #spec color ramp
-            #[0] - 0.00 - #000000
-            #[1] - 0.95 - col= 0.60
-            
-            difframpnode.location    = (-124, 828)
-            specrampnode.location    = (-132, 588)
-            diffuse.location         = (-574, 808)
-            difftorgbnode.location   = (-346, 800)
-            spectorgbnode.location   = (-346, 557)
-            specular.location        = (-574, 565)
-            specrampnode.location    = (-346, 556)
-            colnode.location         = (-360, 280)
-            multcolmixnode.location  = ( -39, 327)
-            multdifmixnode.location  = ( 215, 333)
-            screenmixnode.location   = ( 493, 363)
-            imgnode.location         = (-459, 150)
-            material_output.location = ( 713, 380)
-            
-            #multcolmixnode.data_type = 'RGBA'
-            multcolmixnode.blend_type = 'MULTIPLY'
-            multcolmixnode.inputs[0].default_value = 1.000
-            
-            #multdifmixnode.data_type = 'RGBA'
-            multdifmixnode.blend_type = 'MULTIPLY'
-            multdifmixnode.inputs[0].default_value = 1.000
-            
-            #screenmixnode.data_type = 'RGBA'
-            screenmixnode.blend_type = 'SCREEN'
-            screenmixnode.inputs[0].default_value = 1.000
-            
-            difframpnode.color_ramp.interpolation = 'CONSTANT'
-            difframpnode.color_ramp.elements[0].color = (0.60, 0.60, 0.60, 1.00)
-            
-            difframpnode.color_ramp.elements.new(0.38)
-            difframpnode.color_ramp.elements[1].color = (0.50, 0.50, 0.50, 1.00)
-            
-            difframpnode.color_ramp.elements.new(0.50)
-            difframpnode.color_ramp.elements[2].color = (1.00, 1.00, 1.00, 1.00)
-            
-            specrampnode.color_ramp.interpolation = 'CONSTANT'
-            specrampnode.color_ramp.elements[0].color = (0.00, 0.00, 0.00, 0.00)
-            specrampnode.color_ramp.elements.new(0.95)
-            specrampnode.color_ramp.elements[1].color = (0.60, 0.60, 0.60, 1.00)
-            
-            #links.new(multcolmixnode.inputs[1], colnode.outputs[0])
-            #links.new(multcolmixnode.inputs[2], imgnode.outputs[0])
-            
-            links.new(diffuse.outputs['BSDF'],  difftorgbnode.inputs['Shader'])
-            links.new(specular.outputs['BSDF'], spectorgbnode.inputs['Shader'])
-            
-            links.new(difftorgbnode.outputs['Color'],  difframpnode.inputs['Fac'])
-            links.new(spectorgbnode.outputs['Color'],  specrampnode.inputs['Fac'])
-            
-            links.new(colnode.outputs['Color'], multcolmixnode.inputs['Color1'])
-            links.new(imgnode.outputs['Color'], multcolmixnode.inputs['Color2'])
-            
-            links.new(multcolmixnode.outputs['Color'], multdifmixnode.inputs['Color1'])
-            links.new(difframpnode.outputs['Color'], multdifmixnode.inputs['Color2'])
-            
-            links.new(specrampnode.outputs['Color'], screenmixnode.inputs['Color1'])
-            links.new(multdifmixnode.outputs['Color'], screenmixnode.inputs['Color2'])
-            
-            links.new(screenmixnode.outputs['Color'], material_output.inputs['Surface'])
-            
-        else:
-            imgnode.location = (-350, 350)
-            links.new(material_output.inputs['Surface'], imgnode.outputs[0])
-    return
 
-def build_materials(collection, filename, buffer, offset, material_start, material_list, use_shader_nodes):
+def create_material(material_name, material_property):
+    material = bpy.data.materials.new(material_name)
+    
+    material.AMO_MaterialType  = material_property["AMO_MaterialType"]
+    material.AMO_TextureIndex  = material_property["AMO_TextureIndex"]
+    material.AMO_TextureWidth  = material_property["AMO_TextureWidth"]
+    material.AMO_TextureHeight = material_property["AMO_TextureHeight"]
+    material.AMO_ColorUnk1     = material_property["AMO_ColorUnk1"]
+    material.AMO_ColorUnk2     = material_property["AMO_ColorUnk2"]
+    material.AMO_ColorUnk3     = material_property["AMO_ColorUnk3"]
+    material.AMO_Unknown4      = material_property["AMO_Unknown4"]
+    material.AMO_Unknown5      = material_property["AMO_Unknown5"]
+    
+    return material
+
+
+def build_materials(filename, buffer, offset, material_offset_start):
     print("Building materials...")
-    offset += material_start
+    offset += material_offset_start
     material_properties = get_sector_header(buffer, offset)
-    mat_property = []
-    tmp_mat_list = []
-    tmp_tex_list = []
+    
+    texture_property_list = []
+    material_property_list = []
+    
+    # read through material entries
     if material_properties[0] == "AMO_material_properties":
         print_sector(material_properties)
         offset += 0xC
-        print(filename)
         for x in range(material_properties[1]):
-            type_test = int32_read(buffer, offset)
+            material_type = int32_read(buffer, offset)
+            color_unk1 = float_read(buffer, offset+0x0C), float_read(buffer, offset+0x10), float_read(buffer, offset+0x14), float_read(buffer, offset+0x18)
+            color_unk2 = float_read(buffer, offset+0x1C), float_read(buffer, offset+0x20), float_read(buffer, offset+0x24), float_read(buffer, offset+0x28)
+            color_unk3 = float_read(buffer, offset+0x2C), float_read(buffer, offset+0x30), float_read(buffer, offset+0x34), float_read(buffer, offset+0x38)
+            unknown_4 = float_read(buffer, offset+0x3C)
+            unknown_5 = int32_read(buffer, offset+0x40)
+            texture_list_index = int32_read(buffer, offset+0x10C)
+
+            material_property_list.append({
+            "AMO_MaterialType"  : material_type,
+            "AMO_TextureIndex"  : texture_list_index, # will be update das we pass through the texture list
+            "AMO_TextureWidth"  : -1, # will be updated as we pass through the texture list
+            "AMO_TextureHeight" : -1, # will be updated as we pass through the texture list
+            "AMO_ColorUnk1"     : color_unk1,
+            "AMO_ColorUnk2"     : color_unk2,
+            "AMO_ColorUnk3"     : color_unk3,
+            "AMO_Unknown4"      : unknown_4,
+            "AMO_Unknown5"      : unknown_5
+            })
             
-            unk1 = float_read(buffer, offset+0x0C), float_read(buffer, offset+0x10), float_read(buffer, offset+0x14), float_read(buffer, offset+0x18)
-            unk2 = float_read(buffer, offset+0x1C), float_read(buffer, offset+0x20), float_read(buffer, offset+0x24), float_read(buffer, offset+0x28)
-            unk3 = float_read(buffer, offset+0x2C), float_read(buffer, offset+0x30), float_read(buffer, offset+0x34), float_read(buffer, offset+0x38)
-            unk4 = float_read(buffer, offset+0x3C)
-            unk5 = int32_read(buffer, offset+0x40)
-            texture = int32_read(buffer, offset+0x10C)
-            
-            mat_property.append([type_test, unk1, unk2, unk3, unk4, unk5, texture])
-            mat_skip = int32_read(buffer, offset+0x8)
-            print(f"typetest= {type_test} // matskip = {mat_skip}")
-            if type_test in model_type_dict:
-                model_type = model_type_dict[type_test]
-            else:
-                model_type = "Shadeless"
-            tmp_mat_list.append(model_type)
-            offset += mat_skip
-    
+            material_entry_size = int32_read(buffer, offset+0x8)
+            offset += material_entry_size
+
+    # read through texture entries
     texture_properties = get_sector_header(buffer, offset)
     if texture_properties[0] == "AMO_texture_properties":
         print_sector(texture_properties)
         offset += 0xC
         for x in range(texture_properties[1]):
-            buf_skip = int32_read(buffer, offset+0x8)
-            tex_index  = int32_read(buffer, offset+0xC)
-            tex_width  = int32_read(buffer, offset+0x10)
-            tex_height = int32_read(buffer, offset+0x14)
-            tmp_tex_list.append([tex_index, tex_width, tex_height])
-            mat_type = tmp_mat_list[x]
-            create_material(filename, x, mat_type, tex_index, material_list, mat_property, use_shader_nodes)
-            offset += buf_skip
-        for x in range(len(tmp_tex_list)):
-            tex_index  = tmp_tex_list[x][0]
-            tex_width  = tmp_tex_list[x][1]
-            tex_height = tmp_tex_list[x][2]
-            collection[f"texture_{x}"] = tex_index, tex_width, tex_height
-        
+            texture_index  = int32_read(buffer, offset+0xC)
+            texture_width  = int32_read(buffer, offset+0x10)
+            texture_height = int32_read(buffer, offset+0x14)
 
-def get_indices(buffer, offset, sector_size, strip_count, list, tmp_strip_length):
+            texture_property_list.append({
+            "TextureIndex" : texture_index,
+            "TextureWidth" : texture_width,
+            "TextureHeight" : texture_height
+            })
+
+            texture_entry_size = int32_read(buffer, offset+0x8)
+            offset += texture_entry_size
+    
+    # update material properties with texture list properties (index, width, height)
+    for material_property in material_property_list:
+        
+        texture_list_index = material_property["AMO_TextureIndex"]
+        texture_property = texture_property_list[texture_list_index]
+        
+        
+        material_property["AMO_TextureIndex"] = texture_property["TextureIndex"]
+        material_property["AMO_TextureWidth"] = texture_property["TextureWidth"]
+        material_property["AMO_TextureHeight"] = texture_property["TextureHeight"]
+
+    # create the materials
+    all_materials_list = []
+    for index in range(len(material_property_list)):
+        material_property = material_property_list[index]
+        all_materials_list.append(create_material(f"{filename[:-4]}_mat{index}", material_property))
+    return all_materials_list
+
+
+def get_indices(buffer, offset, sector_size, strip_count, list, strip_length_list):
     offset += 0xC
     for x in range(strip_count):
         count = int16_read(buffer, offset)
         offset += 0x2
         cull_mode = int16_read(buffer, offset) #useless for now
         offset += 0x2
-        tmp_strip_length.append(count-2)
+        strip_length_list.append(count-2)
         tmpstrip = []
         for y in range(count):
             vert_index = int32_read(buffer, offset)
@@ -233,25 +139,28 @@ def get_indices(buffer, offset, sector_size, strip_count, list, tmp_strip_length
         if offset >= sector_size:
             return
 
-def get_vert_coords(buffer, offset, sector_size, vertex_count, list, scale, z_up):
+
+def get_vert_coords(buffer, offset, sector_size, vertex_count, list, scale, use_z_up):
     rotation = mathutils.Euler((math.radians(90.0), 0.0, 0.0), 'XYZ')
     for x in range(vertex_count):
         vertpos = mathutils.Vector((float_read(buffer, offset)*scale, float_read(buffer, offset+0x4)*scale, float_read(buffer, offset+0x8)*scale))
-        if z_up: vertpos.rotate(rotation)
+        if use_z_up: vertpos.rotate(rotation)
         list.append(vertpos)
         offset += 0xC
         if offset >= sector_size:
             return
 
-def get_vert_normals(buffer, offset, sector_size, vertex_count, list, z_up):
+
+def get_vert_normals(buffer, offset, sector_size, vertex_count, list, use_z_up):
     rotation = mathutils.Euler((math.radians(90.0), 0.0, 0.0), 'XYZ')
     for x in range(vertex_count):
         normal = mathutils.Vector((float_read(buffer, offset), float_read(buffer, offset+0x4), float_read(buffer, offset+0x8)))
-        if z_up: normal.rotate(rotation)
+        if use_z_up: normal.rotate(rotation)
         list.append(normal)
         offset += 0xC
         if offset >= sector_size:
             return
+
 
 def get_vert_uvs(buffer, offset, sector_size, vertex_count, list):
     for x in range(vertex_count):
@@ -260,7 +169,8 @@ def get_vert_uvs(buffer, offset, sector_size, vertex_count, list):
         offset += 0x8
         if offset >= sector_size:
             return
-        
+      
+      
 def get_vert_colors(buffer, offset, sector_size, vertex_count, list):
     for x in range(vertex_count):
         color = (float_read(buffer,offset)/255, float_read(buffer,offset+0x4)/255,
@@ -270,6 +180,7 @@ def get_vert_colors(buffer, offset, sector_size, vertex_count, list):
         offset += 0x10
         if offset >= sector_size:
             return
+
 
 def get_vert_groups(buffer, offset, sector_size, vertex_count, list):
     for x in range(vertex_count):
@@ -283,8 +194,10 @@ def get_vert_groups(buffer, offset, sector_size, vertex_count, list):
         vert_group = []
         for f in range(influence_count):
             bone_id = int32_read(buffer, offset)
-            weight = float_read(buffer,offset+0x4)/100
-            vert_group.append((bone_id, weight))
+            weight = float_read(buffer,offset+0x4) / 100 # influence in the format is 0-100, blender is 0-1
+            vert_group.append({
+                "bone_index"  : bone_id, 
+                "bone_weight" : weight})
             offset += 0x8
         list.append(vert_group)
         
@@ -292,159 +205,146 @@ def get_vert_groups(buffer, offset, sector_size, vertex_count, list):
         if offset >= sector_size:
             return
 
-def get_mesh_attributes(buffer, offset, sector_size, list):
+
+def get_mesh_attributes(buffer, offset):
     offset -= 0xC
     
-    attribute_offsets = [
-    0x0C, #max render distance (unused?)
-    0x10, #aa_material (dunno)
-    0x14, 
-    0x18, #aa_cull (unused?)
-    0x1C, #aa_scissor (bool for oclussion culling)
-    0x20, #aa_light (set to 2 in transparent meshes)
-    0x24, 
-    0x28, #aa_uvscroll (...for main menu clouds?)
-    0x2C, 
-    0x30, #aa_fadecolor (dunno) 
-    0x34, #aa_special (dunno) 
-    0x38, 
-    0x3C, 
-    0x40, 
-    0x44, 
-    0x48,
-    0x4C,
-    0x50]
-    
-    for attribute_offset in attribute_offsets:
-        value = int32_read(buffer, offset + attribute_offset)
-        list.append(value)
-    #print(list)
+    return {
+    "AMO_RenderDistance" : int32_read(buffer, offset + 0x0C),
+    "AMO_Unknown_0x10"   : int32_read(buffer, offset + 0x10),
+    "AMO_Unknown_0x14"   : int32_read(buffer, offset + 0x14),
+    "AMO_Culling"        : int32_read(buffer, offset + 0x18),
+    "AMO_Scissor"        : int32_read(buffer, offset + 0x1C),
+    "AMO_Light"          : int32_read(buffer, offset + 0x20),
+    "AMO_Unknown_0x24"   : int32_read(buffer, offset + 0x24),
+    "AMO_UVScroll"       : int32_read(buffer, offset + 0x28),
+    "AMO_Unknown_0x2C"   : int32_read(buffer, offset + 0x2C),
+    "AMO_FadeColor"      : int32_read(buffer, offset + 0x30),
+    "AMO_Special"        : int32_read(buffer, offset + 0x34),
+    "AMO_Unknown_0x38"   : int32_read(buffer, offset + 0x38),
+    "AMO_Unknown_0x3C"   : int32_read(buffer, offset + 0x3C),
+    "AMO_Unknown_0x40"   : int32_read(buffer, offset + 0x40),
+    "AMO_Unknown_0x44"   : int32_read(buffer, offset + 0x44),
+    "AMO_Unknown_0x48"   : int32_read(buffer, offset + 0x48),
+    "AMO_Unknown_0x4C"   : int32_read(buffer, offset + 0x4C),
+    "AMO_Unknown_0x50"   : int32_read(buffer, offset + 0x50)
+    }
 
-def get_mesh_hit(buf, offset, count, list):
-    for x in range(count):
-        unk1 = (int16_read(buf, offset), int16_read(buf, offset+0x2), int16_read(buf, offset+0x4), int16_read(buf, offset+0x6))
-        unk2 = (float_read(buf, offset+0x8), float_read(buf, offset+0xC))
-        list.append([unk1, unk2])
 
-def build_mesh(collection, index, filename, mesh_data, striplength, z_up):
-    indices       = mesh_data[0]
-    mat_list      = mesh_data[1]
-    mat_per_strip = mesh_data[2]
-    vertcoords    = mesh_data[3]
-    vertnormals   = mesh_data[4]
-    vertUVs       = mesh_data[5]
-    vertcolors    = mesh_data[6]
-    vertweights   = mesh_data[7]
-    attributes    = mesh_data[8]
-    hitbox_fetch  = mesh_data[9]
-    material_list = mesh_data[10]
-    
+def get_mesh_bounding_data(buf, offset, scale):
+    return (float_read(buf, offset)*scale, float_read(buf, offset+0x4)*scale,float_read(buf, offset+0x8)*scale, float_read(buf, offset+0xC)*scale)
+
+
+def build_mesh(collection, all_materials_list, index, filename, mesh_data, striplength):
     mesh_name = f"{filename[:-4]}_mesh{index}" 
     target_mesh = bpy.data.meshes.new(mesh_name)
     created_mesh = bpy.data.objects.new(mesh_name, target_mesh)
     collection.objects.link(created_mesh)
     
-    for mat_index in mat_list:
-        for mat in material_list:
+    # adding material to object
+    for mat_index in mesh_data["materials"]:
+        for mat in all_materials_list:
             testname = mat.name.split("_")[-1][3:]
             if '.' in testname: #duplicate material
                 testname = testname.split(".")[0]
             if testname == str(mat_index):
                 target_mesh.materials.append(mat)
     
+    # set vertices
     bm = bmesh.new()
-    for i in range(len(vertcoords)):
-        vert = bm.verts.new(vertcoords[i])
+    for i in range(len(mesh_data["vertices"])):
+        vert = bm.verts.new(mesh_data["vertices"][i])
     bm.to_mesh(target_mesh)
-    
     bm.verts.ensure_lookup_table()
     bm.verts.index_update()
     
-    for vertex_index in indices:
+    # set face indices
+    for vertex_index in mesh_data["indices"]:
         triangle_index = vertex_index
         try:
             face = bm.faces.new((bm.verts[triangle_index[0]], bm.verts[triangle_index[1]], bm.verts[triangle_index[2]]))
         except:
-            continue
+            print(f"invalid face: face = bm.faces.new((bm.verts[{triangle_index[0]}], bm.verts[{triangle_index[1]}], bm.verts[{triangle_index[2]}]))")
         face.smooth = True
     
+    bm.faces.ensure_lookup_table()
+    bm.faces.index_update()
+
+    # set UVs
     uv_layer = bm.loops.layers.uv.new()
     for face in bm.faces:
         for loop in face.loops:
             try:
-                loop[uv_layer].uv = vertUVs[loop.vert.index]
+                loop[uv_layer].uv = mesh_data["UVs"][loop.vert.index]
             except:
-                print(f"invalid: loop[uv_layer].uv = vertUVs[{loop.vert.index}] // vertcount={len(bm.verts)}")
+                print(f"invalid UV: loop[uv_layer].uv = vertUVs[{loop.vert.index}] // vertcount={len(bm.verts)}")
                 continue
-    bm.to_mesh(target_mesh)
+
     
-    #strip list to face list
-    face_mat_list = []
+    # make "material per face" list from original "per strip" list
+    face_material_list = []
     loop_index = 0
-    for mat in mat_per_strip:
+    for material_index in mesh_data["material_indices"]:
         for x in range(striplength[loop_index]):
-            face_mat_list.append(mat)
+            face_material_list.append(material_index)
         loop_index += 1
-        
-    for face in bm.faces:
-        material = face_mat_list[face.index]
-        face.material_index = material
-    bm.to_mesh(target_mesh)
     
-    if len(vertweights) != 0:
+    print(f"material={face_material_list}")
+    # set materials of each face
+    for face in bm.faces:
+        material = face_material_list[face.index]
+        print(face.index, end="")
+        face.material_index = material
+    print("\n\n\n")
+    # set vertex groups
+    if len(mesh_data["weights"]) != 0:
         deform_layer = bm.verts.layers.deform.verify()
         for vert in bm.verts:
-            for group in vertweights[vert.index]:
-                vert_group_name = str(group[0])
-                vert_group_influence = group[1]
+            for group in mesh_data["weights"][vert.index]:
+                vert_group_name = str(group["bone_index"])
+                vert_group_influence = group["bone_weight"]
                 mesh_group = created_mesh.vertex_groups.get(vert_group_name) or created_mesh.vertex_groups.new(name=vert_group_name)
                 vert[deform_layer][mesh_group.index] = vert_group_influence
-        bm.to_mesh(target_mesh)
-
-    if len(attributes) == 18:
-        created_mesh.data['aa_render_dist']  = attributes[0]
-        created_mesh.data['aa_material']     = attributes[1]
-        created_mesh.data['aa_unknown_0x02'] = attributes[2]
-        created_mesh.data['aa_cull']         = attributes[3]
-        created_mesh.data['aa_scissor']      = attributes[4]
-        created_mesh.data['aa_light']        = attributes[5]
-        created_mesh.data['aa_unknown_0x06'] = attributes[6]
-        created_mesh.data['aa_uvscroll']     = attributes[7]
-        created_mesh.data['aa_unknown_0x08'] = attributes[8]
-        created_mesh.data['aa_fadecolor']    = attributes[9]
-        created_mesh.data['aa_special']      = attributes[0xA]
-        created_mesh.data['aa_unknown_0x0B'] = attributes[0xB]
-        created_mesh.data['aa_unknown_0x0C'] = attributes[0xC]
-        created_mesh.data['aa_unknown_0x0D'] = attributes[0xD]
-        created_mesh.data['aa_unknown_0x0E'] = attributes[0xE]
-        created_mesh.data['aa_unknown_0x0F'] = attributes[0xF]
-        created_mesh.data['aa_unknown_0x10'] = attributes[0x10]
-        created_mesh.data['aa_unknown_0x11'] = attributes[0x11]
     
-    for x in range(len(hitbox_fetch)):
-        created_mesh.data[f'bounding_{x}_unk1'] = hitbox_fetch[x][0]
-        created_mesh.data[f'culling_range'] = hitbox_fetch[x][1]
-    
-    loop_normals = []
-    for l in target_mesh.loops:
-        loop_normals.append(vertnormals[l.vertex_index])
-    target_mesh.normals_split_custom_set(loop_normals)
-
-    col_attribute = created_mesh.data.color_attributes.new(
-    name="vertex_color",
-    type='FLOAT_COLOR',
-    domain='POINT',
-    )
-    cols = []
-    for v_index in range(len(created_mesh.data.vertices)):
-        cols += vertcolors[v_index]
-    col_attribute.data.foreach_set("color", cols)
-
+    # pass bmesh to mesh data
+    bm.to_mesh(target_mesh)
     bm.free()
+    
+    # set custom normals off import normal data
+    target_mesh.normals_split_custom_set_from_vertices(mesh_data["normals"])
+    
+    # set vertex colors
+    col_attribute = created_mesh.data.color_attributes.new( name="vertex_color", type='FLOAT_COLOR', domain='POINT',)
+    for vertex_index in range(len(created_mesh.data.vertices)):
+        col_attribute.data[vertex_index].color = mesh_data["colors"][vertex_index]
 
-def amo_read(filedata, filepath, z_up, scale, use_shader_nodes):
-    filebuffer = filedata
-    filename = os.path.basename(filepath)
+    # set mesh attributes
+    if len(mesh_data["attributes"]):
+        created_mesh.data.AMO_RenderDistance = mesh_data["attributes"]["AMO_RenderDistance"]
+        created_mesh.data.AMO_Unknown_0x10   = mesh_data["attributes"]["AMO_Unknown_0x10"]
+        created_mesh.data.AMO_Unknown_0x14   = mesh_data["attributes"]["AMO_Unknown_0x14"]
+        created_mesh.data.AMO_Culling        = mesh_data["attributes"]["AMO_Culling"]
+        created_mesh.data.AMO_Scissor        = mesh_data["attributes"]["AMO_Scissor"]
+        created_mesh.data.AMO_Light          = mesh_data["attributes"]["AMO_Light"]
+        created_mesh.data.AMO_Unknown_0x24   = mesh_data["attributes"]["AMO_Unknown_0x24"]
+        created_mesh.data.AMO_UVScroll       = mesh_data["attributes"]["AMO_UVScroll"]
+        created_mesh.data.AMO_Unknown_0x2C   = mesh_data["attributes"]["AMO_Unknown_0x2C"]
+        created_mesh.data.AMO_FadeColor      = mesh_data["attributes"]["AMO_FadeColor"]
+        created_mesh.data.AMO_Special        = mesh_data["attributes"]["AMO_Special"]
+        created_mesh.data.AMO_Unknown_0x38   = mesh_data["attributes"]["AMO_Unknown_0x38"]
+        created_mesh.data.AMO_Unknown_0x3C   = mesh_data["attributes"]["AMO_Unknown_0x3C"]
+        created_mesh.data.AMO_Unknown_0x40   = mesh_data["attributes"]["AMO_Unknown_0x40"]
+        created_mesh.data.AMO_Unknown_0x44   = mesh_data["attributes"]["AMO_Unknown_0x44"]
+        created_mesh.data.AMO_Unknown_0x48   = mesh_data["attributes"]["AMO_Unknown_0x48"]
+        created_mesh.data.AMO_Unknown_0x4C   = mesh_data["attributes"]["AMO_Unknown_0x4C"]
+        created_mesh.data.AMO_Unknown_0x50   = mesh_data["attributes"]["AMO_Unknown_0x50"]
+    
+    if len(mesh_data["bounding"]) > 0:
+        created_mesh.data.AMO_HasBounding = True
+        created_mesh.data.AMO_Bounding = mesh_data["bounding"]
+
+
+def amo_read(filebuffer, filename, use_z_up, scale):
     sector = get_sector_header(filebuffer, 0x0)
     read_offset = 0
     if sector[0] != "AMO_magic":
@@ -466,13 +366,12 @@ def amo_read(filedata, filepath, z_up, scale, use_shader_nodes):
         collection_name = f"{filename[:-4]}"
         collection = bpy.data.collections.new(collection_name)
         bpy.context.scene.collection.children.link(collection)
-        model_materials = []
-        build_materials(collection, filename, filebuffer, read_offset, model_container[2], model_materials, use_shader_nodes)
+        all_materials_list = build_materials(filename, filebuffer, read_offset, model_container[2])
         read_offset += 0xC
         model_count = model_container[1]
         for model_index in range(model_count):
             
-            tmp_strip_length      = []
+            strip_length_list     = []
             mesh_indices          = []
             mesh_materials        = []
             mesh_vertex_materials = []
@@ -481,8 +380,8 @@ def amo_read(filedata, filepath, z_up, scale, use_shader_nodes):
             mesh_vertex_UVs       = []
             mesh_vertex_colors    = []
             mesh_vertex_weights   = []
-            mesh_hitbox_fetch     = []
-            mesh_attributes       = []
+            mesh_bounding_data    = ()
+            mesh_attributes       = {}
             
             print(f"model index: {model_index} // read offset: {hex(read_offset)}")
             sector_data_count = int32_read(filebuffer, read_offset+0x4)
@@ -498,7 +397,7 @@ def amo_read(filedata, filepath, z_up, scale, use_shader_nodes):
                     for strip_index in range(strip_count):
                         strip_sector =  get_sector_header(filebuffer, read_offset)
                         print_sector(strip_sector)
-                        get_indices(filebuffer, read_offset, read_offset+strip_sector[2], strip_sector[1], mesh_indices, tmp_strip_length)
+                        get_indices(filebuffer, read_offset, read_offset+strip_sector[2], strip_sector[1], mesh_indices, strip_length_list)
                         read_offset += strip_sector[2]
                 
                 elif main_sector[0] == "AMO_material_list":
@@ -512,15 +411,16 @@ def amo_read(filedata, filepath, z_up, scale, use_shader_nodes):
                     read_offset += 0xC
                     for x in range(main_sector[1]):
                         mat = int32_read(filebuffer, read_offset)
+                        print(f"matread={mat}")
                         mesh_vertex_materials.append(mat)
                         read_offset += 0x4
                 
                 elif main_sector[0] == "AMO_vertex_coordinates":
-                    get_vert_coords(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_coords, scale, z_up)
+                    get_vert_coords(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_coords, scale, use_z_up)
                     read_offset += main_sector[2]
                 
                 elif main_sector[0] == "AMO_vertex_normals":
-                    get_vert_normals(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_normals, z_up)
+                    get_vert_normals(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_normals, use_z_up)
                     read_offset += main_sector[2]
                 
                 elif main_sector[0] == "AMO_vertex_UVs":
@@ -536,37 +436,36 @@ def amo_read(filedata, filepath, z_up, scale, use_shader_nodes):
                     read_offset += main_sector[2]
                 
                 elif main_sector[0] == "AMO_mesh_attributes":
-                    get_mesh_attributes(filebuffer, read_offset+0xC, read_offset+main_sector[2], mesh_attributes)
+                    mesh_attributes = get_mesh_attributes(filebuffer, read_offset+0xC)
                     read_offset += main_sector[2]
 
                 elif main_sector[0] == "AMO_hitbox_identifier":
-                    get_mesh_hit(filebuffer, read_offset+0xC, main_sector[1], mesh_hitbox_fetch)
+                    mesh_bounding_data = get_mesh_bounding_data(filebuffer, read_offset+0xC, scale)
                     read_offset += main_sector[2] #todo
                 
                 elif main_sector[0] == "AMO_unused_unknown":
                     #completely unused sector, don't know the purpose, never called by GetSubDataAMO 
                     read_offset += main_sector[2]
                 
-            mesh_data = [
-            mesh_indices,
-            mesh_materials, 
-            mesh_vertex_materials, 
-            mesh_vertex_coords, 
-            mesh_vertex_normals, 
-            mesh_vertex_UVs, 
-            mesh_vertex_colors,
-            mesh_vertex_weights,
-            mesh_attributes,
-            mesh_hitbox_fetch,
-            model_materials
-            ]
-            build_mesh(collection, model_index, filename, mesh_data, tmp_strip_length, z_up)
+            mesh_data = {
+            "indices"          : mesh_indices,
+            "materials"        : mesh_materials, 
+            "material_indices" : mesh_vertex_materials, 
+            "vertices"         : mesh_vertex_coords, 
+            "normals"          : mesh_vertex_normals, 
+            "UVs"              : mesh_vertex_UVs, 
+            "colors"           : mesh_vertex_colors,
+            "weights"          : mesh_vertex_weights,
+            "attributes"       : mesh_attributes,
+            "bounding"         : mesh_bounding_data}
+            
+            build_mesh(collection, all_materials_list, model_index, filename, mesh_data, strip_length_list)
 
 
-def read(context, filepath, z_up, scale, use_shader_nodes): #, use_some_setting
-    print("running read_some_data...")
-    f = open(filepath, 'rb')
-    data = f.read()
-    f.close()
-    amo_read(data, filepath, z_up, scale, use_shader_nodes)
+def read(context, filepath, use_z_up, scale): #, use_some_setting
+    input_file = open(filepath, 'rb')
+    input_file_bytes = input_file.read()
+    input_file.close()
+    filename = os.path.basename(filepath)
+    amo_read(input_file_bytes, filename, use_z_up, scale)
     return {'FINISHED'}

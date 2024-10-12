@@ -1,3 +1,15 @@
+import importlib
+import sys
+
+current_package_prefix = f"{__name__}." # so reload works properly
+for name, module in sys.modules.copy().items():
+    if name.startswith(current_package_prefix):
+        try: 
+            importlib.reload(module)
+            print(f"{current_package_prefix}: Reloading {name}")
+        except:
+            print(f"{current_package_prefix}: {name} failed.")
+
 import bpy
 
 bl_info = {
@@ -144,15 +156,6 @@ class Import_AHI(Operator, ImportHelper):
     # ImportHelper mixin class uses this
     filename_ext = ".ahi/.bin"
     
-    def get_collections(self, context):
-        collection = bpy.data.collections.get(self.collection)
-        
-
-        if collection != None:
-            for armature in [obj for obj in col.objects if obj.type == 'ARMATURE']:
-                for empty in [obj for obj in armature.children if obj.type == 'EMPTY']:
-                    self.meshes_to_export.add().name = empty.name
-    
     filter_glob: StringProperty(
         default="*.ahi;*.bin",
         options={'HIDDEN'},
@@ -207,18 +210,9 @@ class Import_AMO(Operator, ImportHelper):
         default=True,
     )
     
-    
-    use_shader_nodes: BoolProperty(
-        name="Set Up Material Nodes",
-        description="Automatically set up shader nodes for certain material types",
-        default=False,
-    )
-    
-    
-    
     def execute(self, context):
         from .file_handling.artistoon_import import AMO_importer
-        return AMO_importer.read(context, self.filepath, self.z_up, self.user_scale, self.use_shader_nodes) # self.use_setting
+        return AMO_importer.read(context, self.filepath, self.z_up, self.user_scale) # self.use_setting
 
 ### ###
 
@@ -243,9 +237,14 @@ classes = [
     Import_AMO
     ]
 
+from .blender import AMO_mesh_attribute_panel
+from .blender import AMO_material_panel
+
 def register():
     for art_class in classes:
         bpy.utils.register_class(art_class)
+    AMO_mesh_attribute_panel.register()
+    AMO_material_panel.register()
     bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
@@ -253,6 +252,8 @@ def register():
 def unregister():
     for art_class in classes:
         bpy.utils.unregister_class(art_class)
+    AMO_mesh_attribute_panel.unregister()
+    AMO_material_panel.unregister()
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
 
