@@ -6,12 +6,15 @@ class AMOMaterialPanel(bpy.types.Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "data"
-
+    
+    @classmethod
+    def poll(cls, context):
+        object = context.object
+        return object and object.type == 'MESH'
+    
     def draw(self, context):
         layout = self.layout
         layout_box = layout.box()
-        
-        
         
         row = layout_box.row()
         row.prop(context.mesh, "AMO_HasBounding")

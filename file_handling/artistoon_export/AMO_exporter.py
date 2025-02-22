@@ -9,7 +9,6 @@ from ...pyffi.utils import tristrip
 
 z_up_rotation = mathutils.Euler((math.radians(-90.0), 0.0, 0.0), 'XYZ')
 
-
 def get_all_materials(collection):
     
     def get_material_name(material):

@@ -7,6 +7,11 @@ class AMOMaterialPanel(bpy.types.Panel):
     bl_region_type = 'WINDOW'
     bl_context = "material"
 
+    @classmethod
+    def poll(cls, context):
+        material = context.object.active_material
+        return material != None
+
     def draw(self, context):
         try:
             layout = self.layout.box()

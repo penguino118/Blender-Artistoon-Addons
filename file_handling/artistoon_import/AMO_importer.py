@@ -3,29 +3,10 @@ import os
 import bmesh
 import math
 import mathutils
-from ..sector_handler import AMO_sector_dict as sector_type_dict
+from ..sector_handler import get_sector_info, AMO_sector_dict as sector_types
 from ..binary_rw import int16_read, int32_read, float_read
 
-def get_sector_type(buffer, offset):
-    head = int32_read(buffer, offset)
-    #print(head)
-    if head in sector_type_dict:
-        return sector_type_dict[head]
-    else:
-        return f"unsupported sector : {head} at offset {offset}"
-
-
-def get_sector_header(buffer, offset):
-    head = get_sector_type(buffer, offset)
-    count = int32_read(buffer, offset+4)
-    size = int32_read(buffer, offset+8)
-    return [head, count, size]
-
-
-def print_sector(sector):
-    if len(sector) < 3:
-        print("invalid sector!! size under 3")
-    print(f"Sector Type: {sector[0]}, Data Count: {sector[1]}, Size: {sector[2]}")
+z_up_rotation = mathutils.Euler((math.radians(90.0), 0.0, 0.0), 'XYZ')
 
 
 def create_material(material_name, material_property):
@@ -46,18 +27,19 @@ def create_material(material_name, material_property):
 
 def build_materials(filename, buffer, offset, material_offset_start):
     print("Building materials...")
-    offset += material_offset_start
-    material_properties = get_sector_header(buffer, offset)
     
     texture_property_list = []
     material_property_list = []
+    offset += material_offset_start
     
     # read through material entries
-    if material_properties[0] == "AMO_material_properties":
-        print_sector(material_properties)
+    material_properties = get_sector_info(buffer, offset)
+    if material_properties["header"] == sector_types["MaterialList"]:
         offset += 0xC
-        for x in range(material_properties[1]):
+        for x in range(material_properties["data_count"]):
             material_type = int32_read(buffer, offset)
+            # i assume these are color values for shadow, diffuse, and specular
+            # they're not actually use for rendering though... so who knows what it's actually for
             color_unk1 = float_read(buffer, offset+0x0C), float_read(buffer, offset+0x10), float_read(buffer, offset+0x14), float_read(buffer, offset+0x18)
             color_unk2 = float_read(buffer, offset+0x1C), float_read(buffer, offset+0x20), float_read(buffer, offset+0x24), float_read(buffer, offset+0x28)
             color_unk3 = float_read(buffer, offset+0x2C), float_read(buffer, offset+0x30), float_read(buffer, offset+0x34), float_read(buffer, offset+0x38)
@@ -79,13 +61,12 @@ def build_materials(filename, buffer, offset, material_offset_start):
             
             material_entry_size = int32_read(buffer, offset+0x8)
             offset += material_entry_size
-
+    
     # read through texture entries
-    texture_properties = get_sector_header(buffer, offset)
-    if texture_properties[0] == "AMO_texture_properties":
-        print_sector(texture_properties)
+    texture_properties = get_sector_info(buffer, offset)
+    if texture_properties["header"] == sector_types["TextureList"]:
         offset += 0xC
-        for x in range(texture_properties[1]):
+        for x in range(texture_properties["data_count"]):
             texture_index  = int32_read(buffer, offset+0xC)
             texture_width  = int32_read(buffer, offset+0x10)
             texture_height = int32_read(buffer, offset+0x14)
@@ -104,8 +85,7 @@ def build_materials(filename, buffer, offset, material_offset_start):
         
         texture_list_index = material_property["AMO_TextureIndex"]
         texture_property = texture_property_list[texture_list_index]
-        
-        
+
         material_property["AMO_TextureIndex"] = texture_property["TextureIndex"]
         material_property["AMO_TextureWidth"] = texture_property["TextureWidth"]
         material_property["AMO_TextureHeight"] = texture_property["TextureHeight"]
@@ -118,33 +98,30 @@ def build_materials(filename, buffer, offset, material_offset_start):
     return all_materials_list
 
 
-def get_indices(buffer, offset, sector_size, strip_count, list, strip_length_list):
+def get_indices(buffer, offset, strip_count, list, strip_length_list):
     offset += 0xC
     for x in range(strip_count):
         count = int16_read(buffer, offset)
-        offset += 0x2
-        cull_mode = int16_read(buffer, offset) #useless for now
-        offset += 0x2
         strip_length_list.append(count-2)
-        tmpstrip = []
+        index_list = []
+        #cull_mode = int16_read(buffer, offset) # not actually used in rendering?
+        offset += 0x4
         for y in range(count):
             vert_index = int32_read(buffer, offset)
+            index_list.append(vert_index)  
             offset += 0x4
-            tmpstrip.append(vert_index)  
-        for y in range(len(tmpstrip)-2):
+        # convert tri strip to tri list
+        for y in range(len(index_list)-2):
             if (y % 2) == 0:
-                list.append([tmpstrip[y], tmpstrip[y+1], tmpstrip[y+2]])
+                list.append([index_list[y], index_list[y+1], index_list[y+2]])
             else:
-                list.append([tmpstrip[y], tmpstrip[y+2], tmpstrip[y+1]])     
-        if offset >= sector_size:
-            return
+                list.append([index_list[y], index_list[y+2], index_list[y+1]])
 
 
 def get_vert_coords(buffer, offset, sector_size, vertex_count, list, scale, use_z_up):
-    rotation = mathutils.Euler((math.radians(90.0), 0.0, 0.0), 'XYZ')
     for x in range(vertex_count):
         vertpos = mathutils.Vector((float_read(buffer, offset)*scale, float_read(buffer, offset+0x4)*scale, float_read(buffer, offset+0x8)*scale))
-        if use_z_up: vertpos.rotate(rotation)
+        if use_z_up: vertpos.rotate(z_up_rotation)
         list.append(vertpos)
         offset += 0xC
         if offset >= sector_size:
@@ -152,10 +129,9 @@ def get_vert_coords(buffer, offset, sector_size, vertex_count, list, scale, use_
 
 
 def get_vert_normals(buffer, offset, sector_size, vertex_count, list, use_z_up):
-    rotation = mathutils.Euler((math.radians(90.0), 0.0, 0.0), 'XYZ')
     for x in range(vertex_count):
         normal = mathutils.Vector((float_read(buffer, offset), float_read(buffer, offset+0x4), float_read(buffer, offset+0x8)))
-        if use_z_up: normal.rotate(rotation)
+        if use_z_up: normal.rotate(z_up_rotation)
         list.append(normal)
         offset += 0xC
         if offset >= sector_size:
@@ -182,7 +158,7 @@ def get_vert_colors(buffer, offset, sector_size, vertex_count, list):
             return
 
 
-def get_vert_groups(buffer, offset, sector_size, vertex_count, list):
+def get_vert_weights(buffer, offset, sector_size, vertex_count, list):
     for x in range(vertex_count):
         influence_count = int32_read(buffer, offset)
         
@@ -235,12 +211,12 @@ def get_mesh_bounding_data(buf, offset, scale):
     return (float_read(buf, offset)*scale, float_read(buf, offset+0x4)*scale,float_read(buf, offset+0x8)*scale, float_read(buf, offset+0xC)*scale)
 
 
-def build_mesh(collection, all_materials_list, index, filename, mesh_data, striplength):
+def build_mesh(all_materials_list, index, filename, mesh_data, striplength):
     mesh_name = f"{filename[:-4]}_mesh{index}" 
     target_mesh = bpy.data.meshes.new(mesh_name)
     created_mesh = bpy.data.objects.new(mesh_name, target_mesh)
-    collection.objects.link(created_mesh)
-    
+    bpy.context.scene.collection.objects.link(created_mesh)
+
     # adding material to object
     for mat_index in mesh_data["materials"]:
         for mat in all_materials_list:
@@ -263,9 +239,10 @@ def build_mesh(collection, all_materials_list, index, filename, mesh_data, strip
         triangle_index = vertex_index
         try:
             face = bm.faces.new((bm.verts[triangle_index[0]], bm.verts[triangle_index[1]], bm.verts[triangle_index[2]]))
+            face.smooth = True
         except:
             print(f"invalid face: face = bm.faces.new((bm.verts[{triangle_index[0]}], bm.verts[{triangle_index[1]}], bm.verts[{triangle_index[2]}]))")
-        face.smooth = True
+        
     
     bm.faces.ensure_lookup_table()
     bm.faces.index_update()
@@ -289,13 +266,11 @@ def build_mesh(collection, all_materials_list, index, filename, mesh_data, strip
             face_material_list.append(material_index)
         loop_index += 1
     
-    print(f"material={face_material_list}")
     # set materials of each face
     for face in bm.faces:
         material = face_material_list[face.index]
-        print(face.index, end="")
         face.material_index = material
-    print("\n\n\n")
+
     # set vertex groups
     if len(mesh_data["weights"]) != 0:
         deform_layer = bm.verts.layers.deform.verify()
@@ -342,34 +317,35 @@ def build_mesh(collection, all_materials_list, index, filename, mesh_data, strip
     if len(mesh_data["bounding"]) > 0:
         created_mesh.data.AMO_HasBounding = True
         created_mesh.data.AMO_Bounding = mesh_data["bounding"]
+    
+    return created_mesh
 
 
-def amo_read(filebuffer, filename, use_z_up, scale):
-    sector = get_sector_header(filebuffer, 0x0)
-    read_offset = 0
-    if sector[0] != "AMO_magic":
-        print(f"magic sect missing 0x0\n{sector[0]}")
-        return
-    else:
-        sector = get_sector_header(filebuffer, 0xC)
-        if sector[0] != "AMO_unknown":
-            print(f"unknown sect missing 0xC\n{sector[0]}")
-            return
-        else:
-            read_offset = 0xC + sector[2]
+def amo_read(filebuffer, filepath, use_z_up, user_scale):
+    filename = os.path.basename(filepath)
+    read_offset = 0x0
+    created_objects = []
+    
+    start_sector = get_sector_info(filebuffer, 0x0)
+    unknown_sector = get_sector_info(filebuffer, 0xC)
+    
+    if start_sector["header"] != sector_types["Magic"]:
+        print("Magic sector missing from model file.")
+        return []
+    if unknown_sector["header"] != sector_types["Unknown0002"]:
+        print("Unknown sector (0x20000) missing from model file.")
+        return []
+
+    read_offset = 0xC + unknown_sector["data_size"]
+    model_container = get_sector_info(filebuffer, read_offset)
+    
+    if model_container["header"] == sector_types["ModelHeader"]:
+        all_materials_list = build_materials(filename, filebuffer, read_offset, model_container["data_size"])
+        read_offset += 0xC # skip over the model container header
+        for model_index in range(model_container["data_count"]):
             
-    model_container = get_sector_header(filebuffer, read_offset)
-    if model_container[0] != "AMO_model_container":
-        print(f"model container missing, offset: {read_offset}")
-        return
-    else:
-        collection_name = f"{filename[:-4]}"
-        collection = bpy.data.collections.new(collection_name)
-        bpy.context.scene.collection.children.link(collection)
-        all_materials_list = build_materials(filename, filebuffer, read_offset, model_container[2])
-        read_offset += 0xC
-        model_count = model_container[1]
-        for model_index in range(model_count):
+            mesh_sector = get_sector_info(filebuffer, read_offset)
+            read_offset += 0xC # skip over mesh sector container header
             
             strip_length_list     = []
             mesh_indices          = []
@@ -383,70 +359,65 @@ def amo_read(filebuffer, filename, use_z_up, scale):
             mesh_bounding_data    = ()
             mesh_attributes       = {}
             
-            print(f"model index: {model_index} // read offset: {hex(read_offset)}")
-            sector_data_count = int32_read(filebuffer, read_offset+0x4)
-            read_offset += 0xC
-            
-            for sector in range(sector_data_count):
-                main_sector = get_sector_header(filebuffer, read_offset)
-                print_sector(main_sector)
+            for s in range(mesh_sector["data_count"]):
                 
-                if main_sector[0] == "AMO_tristrip_container":    
-                    strip_count = main_sector[1]
-                    read_offset += 0xC
-                    for strip_index in range(strip_count):
-                        strip_sector =  get_sector_header(filebuffer, read_offset)
-                        print_sector(strip_sector)
-                        get_indices(filebuffer, read_offset, read_offset+strip_sector[2], strip_sector[1], mesh_indices, strip_length_list)
-                        read_offset += strip_sector[2]
+                current_sector = get_sector_info(filebuffer, read_offset)
+                read_offset += 0xC
                 
-                elif main_sector[0] == "AMO_material_list":
-                    read_offset += 0xC
-                    for x in range(main_sector[1]):
-                        mat = int32_read(filebuffer, read_offset)
-                        mesh_materials.append(mat)
-                        read_offset += 0x4
-                
-                elif main_sector[0] == "AMO_material_per_strip":
-                    read_offset += 0xC
-                    for x in range(main_sector[1]):
-                        mat = int32_read(filebuffer, read_offset)
-                        print(f"matread={mat}")
-                        mesh_vertex_materials.append(mat)
-                        read_offset += 0x4
-                
-                elif main_sector[0] == "AMO_vertex_coordinates":
-                    get_vert_coords(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_coords, scale, use_z_up)
-                    read_offset += main_sector[2]
-                
-                elif main_sector[0] == "AMO_vertex_normals":
-                    get_vert_normals(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_normals, use_z_up)
-                    read_offset += main_sector[2]
-                
-                elif main_sector[0] == "AMO_vertex_UVs":
-                    get_vert_uvs(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_UVs)
-                    read_offset += main_sector[2]
-                
-                elif main_sector[0] == "AMO_vertex_colors":
-                    get_vert_colors(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_colors)
-                    read_offset += main_sector[2]
-                
-                elif main_sector[0] == "AMO_vertex_groups":
-                    get_vert_groups(filebuffer, read_offset+0xC, read_offset+main_sector[2], main_sector[1], mesh_vertex_weights)
-                    read_offset += main_sector[2]
-                
-                elif main_sector[0] == "AMO_mesh_attributes":
-                    mesh_attributes = get_mesh_attributes(filebuffer, read_offset+0xC)
-                    read_offset += main_sector[2]
+                if current_sector["header"] == sector_types.get("TriStripContainer"):
+                    # get strips from all tristrips sectors if it has both or just one
+                    for x in range(current_sector["data_count"]):
+                        # there's a sector used for regular tri strips (0x0003)
+                        # and then there's another version (0x0004) that has strips that index vertices which
+                        # are influenced by more than one bone
+                        # i haven't noticed any other variations in either giogio or auto modellista
+                        strip_sector = get_sector_info(filebuffer, read_offset)
+                        get_indices(filebuffer, read_offset, strip_sector["data_count"], mesh_indices, strip_length_list)
+                        read_offset += strip_sector["data_size"]
+                    continue
 
-                elif main_sector[0] == "AMO_hitbox_identifier":
-                    mesh_bounding_data = get_mesh_bounding_data(filebuffer, read_offset+0xC, scale)
-                    read_offset += main_sector[2] #todo
+                if current_sector["header"] == sector_types.get("MeshMaterialList"): # materials used by the mesh
+                    for x in range(current_sector["data_count"]):
+                        material_index = int32_read(filebuffer, read_offset)
+                        mesh_materials.append(material_index)
+                        read_offset += 0x4
+                    continue
+
+                if current_sector["header"] == sector_types.get("MaterialIndices"):
+                    for x in range(current_sector["data_count"]): # materials per triangle strip
+                        material_index = int32_read(filebuffer, read_offset)
+                        mesh_vertex_materials.append(material_index)
+                        read_offset += 0x4
+                    continue
+
+                if current_sector["header"] == sector_types.get("VertexCoordinates"):
+                    get_vert_coords(filebuffer, read_offset, read_offset+current_sector["data_size"], 
+                                    current_sector["data_count"], mesh_vertex_coords, user_scale, use_z_up)
+
+                if current_sector["header"] == sector_types.get("VertexNormals"):
+                    get_vert_normals(filebuffer, read_offset, read_offset+current_sector["data_size"], 
+                                    current_sector["data_count"], mesh_vertex_normals, use_z_up)
+
+                if current_sector["header"] == sector_types.get("VertexUVs"):
+                    get_vert_uvs(filebuffer, read_offset, read_offset+current_sector["data_size"], 
+                                    current_sector["data_count"], mesh_vertex_UVs)
+                    
+                if current_sector["header"] == sector_types.get("VertexColors"):
+                    get_vert_colors(filebuffer, read_offset, read_offset+current_sector["data_size"], 
+                                    current_sector["data_count"], mesh_vertex_colors)
+                    
+                if current_sector["header"] == sector_types.get("VertexWeights"):
+                    get_vert_weights(filebuffer, read_offset, read_offset+current_sector["data_size"], 
+                                    current_sector["data_count"], mesh_vertex_weights)
                 
-                elif main_sector[0] == "AMO_unused_unknown":
-                    #completely unused sector, don't know the purpose, never called by GetSubDataAMO 
-                    read_offset += main_sector[2]
+                if current_sector["header"] == sector_types.get("Attributes"):
+                    mesh_attributes = get_mesh_attributes(filebuffer, read_offset)
                 
+                if current_sector["header"] == sector_types.get("BoundingBox"):
+                    mesh_bounding_data = get_mesh_bounding_data(filebuffer, read_offset, user_scale)
+            
+                read_offset += current_sector["data_size"] - 0xC
+
             mesh_data = {
             "indices"          : mesh_indices,
             "materials"        : mesh_materials, 
@@ -459,13 +430,16 @@ def amo_read(filebuffer, filename, use_z_up, scale):
             "attributes"       : mesh_attributes,
             "bounding"         : mesh_bounding_data}
             
-            build_mesh(collection, all_materials_list, model_index, filename, mesh_data, strip_length_list)
+            created_objects.append(
+                build_mesh(all_materials_list, model_index, filename, mesh_data, strip_length_list)
+                )
+
+    return created_objects
 
 
-def read(context, filepath, use_z_up, scale): #, use_some_setting
+def read(context, filepath, use_z_up, user_scale): #, use_some_setting
     input_file = open(filepath, 'rb')
     input_file_bytes = input_file.read()
     input_file.close()
-    filename = os.path.basename(filepath)
-    amo_read(input_file_bytes, filename, use_z_up, scale)
+    amo_read(input_file_bytes, filepath, use_z_up, user_scale)
     return {'FINISHED'}

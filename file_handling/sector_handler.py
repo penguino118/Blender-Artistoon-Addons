@@ -1,5 +1,15 @@
-from .binary_rw import int32_write
+from .binary_rw import int32_write, int32_read
 
+def get_sector_info(buffer, offset):
+    head = int32_read(buffer, offset)
+    count = int32_read(buffer, offset+4)
+    size = int32_read(buffer, offset+8)
+
+    return {
+        "header" : head,
+        "data_count" : count,
+        "data_size" : size
+    }
 
 def get_sector_size(array):
     tmpb = 0x4
@@ -32,32 +42,31 @@ AAN_sector_dict = {
 
 # Armature
 AHI_sector_dict = {
-    0xC0000000  : "AHI_magic",       #start of the file #count is global sector count
-    0x00000000  : "AHI_tree_root",   #tree root model number (??)
-    0x40000001  : "AHI_bone_type_1", #bone type 1
-    0x40000002  : "AHI_bone_type_2", #bone type 1
+    "Magic"          : 0xC0000000,     
+    "HierarchyRoots" : 0x00000000, # Roots of the bone hierarchy
+    "BoneNode"       : 0x40000000  # is OR'd by some 'type' indicator, type 1 is used on characters and 2 on stages
     }
 
 # Model
 AMO_sector_dict = { 
-    0x00000001 : "AMO_magic",
-    0x00020000 : "AMO_unknown",             #something about RAM?
-    0x00000002 : "AMO_model_container",     #game func: GetModelNum
-    0x00000004 : "AMO_mesh_container",
-    0x00000005 : "AMO_tristrip_container",  #GetIndexListAMOModelMesh
-    0x00030000 : "AMO_tristrip_03_data",
-    0x00040000 : "AMO_tristrip_04_data",    #triangles with multiple bone deformations
-    0x00050000 : "AMO_material_list",       #per mesh material
-    0x00060000 : "AMO_material_per_strip",
-    0x00070000 : "AMO_vertex_coordinates",  #GetVertexAMOModelMesh
-    0x00080000 : "AMO_vertex_normals",      #GetNormalAMOModelMesh
-    0x000A0000 : "AMO_vertex_UVs",
-    0x000B0000 : "AMO_vertex_colors",       #GetVertexColorAMOModelMesh
-    0x000C0000 : "AMO_vertex_groups",       #GetWeightAMOModelMesh
-    0x000E0000 : "AMO_unused_unknown",      #Never called by GetSubDataAMO, only present in st021
-    0x000F0000 : "AMO_mesh_attributes",     #PlAMOGetModelAttributes
-    0x00110000 : "AMO_hitbox_identifier",   #bounding model fetch, used for stages
-    0x00000009 : "AMO_material_properties", #global
-    0x0000000A : "AMO_texture_properties"
+    "Magic"             : 0x00000001,
+    "Unknown0002"       : 0x00020000, # Never fetched by GetSubDataAMO
+    "ModelHeader"       : 0x00000002, #  function: GetModelNum, plAMOGetModelHead
+    "MeshDataContainer" : 0x00000004, 
+    "TriStripContainer" : 0x00000005, #  function: GetIndexListAMOModelMesh, GetIndexListDescAMOModelMesh, GetPrimitiveNumAMOModelMesh, GetPrimVertexNumAMOModelMesh, GetPrimCullTypeAMOModelMesh
+    "TriStrips"         : 0x00030000, 
+    "TriStripsComplex"  : 0x00040000, # For tristrips with vertices that have multiple bones influencing them
+    "MeshMaterialList"  : 0x00050000, #  function: plAMOGetMaterialListNum, plAMOGetMaterialList // materials of the mesh, not all 
+    "MaterialIndices"   : 0x00060000, #  function: GetMaterialIndexAMOModelMesh // materials per triangle strip
+    "VertexCoordinates" : 0x00070000, #  function: GetVertexNumAMOModelMesh, GetVertexAMOModelMesh
+    "VertexNormals"     : 0x00080000, #  function: GetNormalAMOModelMesh
+    "VertexUVs"         : 0x000A0000, #  function: GetStAMOModelMesh
+    "VertexColors"      : 0x000B0000, #  function: GetVertexColorAMOModelMesh
+    "VertexWeights"     : 0x000C0000, #  function: GetWeightNumAMOModelMesh, GetWeightAMOModelMesh
+    "Unknown000E"       : 0x000E0000, # Never fetched by GetSubDataAMO, only present in st021.pzz
+    "Attributes"        : 0x000F0000, #  function: PlAMOGetModelAttributes
+    "BoundingBox"       : 0x00110000, #  function: plAMOGetBoundingModel // bounding box, used for occlusion culling in stage models
+    "MaterialList"      : 0x00000009, #  function: plAMOGetMaterialNum, plAMOGetMaterialHead
+    "TextureList"       : 0x0000000A  #  function: plAMOGetTextureHead
     }
 
