@@ -7,7 +7,7 @@ import math
 from ..sector_handler import get_sector_info, AHI_sector_dict as sector_type_dict
 from ..binary_rw import int16_read, int32_read, int32_read_signed, float_read
 
-z_up_rotation = mathutils.Euler((math.radians(90.0), 0.0, 0.0), 'XYZ')
+z_up_rotation = mathutils.Euler((math.radians(90.0), 0.0, math.radians(180.0)), 'XYZ')
 
 
 
@@ -57,10 +57,9 @@ def get_bone_data(buffer, offset, user_scale):
                                     float_read(buffer, offset+0x20)*user_scale, 
                                     float_read(buffer, offset+0x24)*user_scale, 
                                     float_read(buffer, offset+0x28)*user_scale)),
-        "rotation" : mathutils.Vector((float_read(buffer, offset+0x2C)*user_scale,
-                                       float_read(buffer, offset+0x30)*user_scale,
-                                       float_read(buffer, offset+0x34)*user_scale,
-                                       float_read(buffer, offset+0x38)*user_scale)),
+        "rotation" : mathutils.Vector((math.degrees(float_read(buffer, offset+0x2C)),
+                                       math.degrees(float_read(buffer, offset+0x30)),
+                                       math.degrees(float_read(buffer, offset+0x34)))),
         "position" : mathutils.Vector((float_read(buffer, offset+0x3C)*user_scale,
                                        float_read(buffer, offset+0x40)*user_scale,
                                        float_read(buffer, offset+0x44)*user_scale,
@@ -94,9 +93,12 @@ def build_armature(filename, bone_data_list, root_bone_list, mesh_objects):
     
     def get_matrix(bone_data):
         position = bone_data["position"]
-        rotation = mathutils.Euler(bone_data["rotation"][0:3], 'XYZ')
-        scale = bone_data["scale"]
-        return mathutils.Matrix.LocRotScale(position[0:3], rotation, scale[0:3])
+        print(bone_data["rotation"])
+        print("-  ", bone_data["rotation"])
+        rotation = mathutils.Euler(bone_data["rotation"], 'XYZ') 
+        print("+  ", rotation)
+        scale = mathutils.Vector((1.0, 1.0, 1.0))
+        return mathutils.Matrix.LocRotScale(position[0:3], rotation, scale)
 
     def get_collecton(armature, type):
         collection_name = f"Type {str(type)}"
@@ -133,7 +135,13 @@ def build_armature(filename, bone_data_list, root_bone_list, mesh_objects):
         bone_collection = get_collecton(target_armature, bone_data["type"])
         bone_collection.assign(bone)
         
+
         bone.matrix = get_matrix(bone_data) # set transformation matrix
+        
+        if bone_data_list.index(bone_data) == 20:
+            print(bone.matrix)
+        # todo: add scale property somewhere
+    
     for bone_data in bone_data_list:
         if (bone_data["parent"] != -1): # transform by it's parent if it exists
             bone = target_armature.edit_bones.get(str(bone_data["index"])) 
@@ -191,7 +199,9 @@ def ahi_read(filebuffer, filepath, mesh_objects, use_z_up, user_scale):
             bone_data = get_bone_data(filebuffer, read_offset, user_scale)
             if use_z_up:
                 bone_data["scale"].rotate(z_up_rotation)
+                print("pre=", bone_data["rotation"])
                 bone_data["rotation"].rotate(z_up_rotation)
+                print("pos=", bone_data["rotation"])
                 bone_data["position"].rotate(z_up_rotation)
             bone_data_list.append(bone_data)
 

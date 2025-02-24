@@ -6,7 +6,7 @@ import mathutils
 from ..sector_handler import get_sector_info, AMO_sector_dict as sector_types
 from ..binary_rw import int16_read, int32_read, float_read
 
-z_up_rotation = mathutils.Euler((math.radians(90.0), 0.0, 0.0), 'XYZ')
+z_up_rotation = mathutils.Euler((math.radians(90.0), 0.0, math.radians(180.0)), 'XYZ')
 
 
 def create_material(material_name, material_property):

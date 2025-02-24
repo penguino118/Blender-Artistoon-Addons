@@ -17,7 +17,7 @@ def load_from_pzz(context, filepath, use_z_up, user_scale):
         for file_index in range(file_count):
             file_size = int16_read(buffer, read_offset) * 0x800
             is_compressed = int16_read(buffer, read_offset+0x2) == 0x8000
-            print(f"////////Gaga/////////////////////////////////////////  file {file_index}: {is_compressed} ({int16_read(buffer, read_offset)})")
+            print(f"//////////////////////////////  file {file_index}: is_compressed={is_compressed} ({int16_read(buffer, read_offset)})")
             if file_size < 1: continue
             file_buffer = buffer[file_offset:file_offset+file_size]
             if is_compressed: file_buffer = get_decompressed(file_buffer)
@@ -35,17 +35,25 @@ def load_from_pzz(context, filepath, use_z_up, user_scale):
             file = file_list[f]
             match(file["type"]):
                 case "AMO": 
-
-                    ahi_file = file_list[f+1]
                     # if we find a model, we'll import it
+                    mesh_objects = AMO_importer.amo_read(file["buffer"], filepath, use_z_up, user_scale)
                     # then we go through and import the armature with the objects imported from the model
                     # the armature is always the file next to the model
+                    if f+1 <= len(file_list):  # but just in case, we check
+                        ahi_file = file_list[f+1] 
+                        if ahi_file["type"] == "AHI": 
+                            AHI_importer.ahi_read(ahi_file["buffer"], filepath, mesh_objects, use_z_up, user_scale)
                     
-                    mesh_objects = AMO_importer.amo_read(file["buffer"], filepath, use_z_up, user_scale)
-                    
-                    if ahi_file["type"] != "AHI": continue # just in case
-                    
-                    AHI_importer.ahi_read(ahi_file["buffer"], filepath, mesh_objects, use_z_up, user_scale)
+                    else:
+                        # if there's no armature let's parent to an empty object instead
+                        print(f"No armature found, parenting to empty")
+                        import bpy
+                        from os import path
+                        mesh_objects = AMO_importer.amo_read(file["buffer"], filepath, use_z_up, user_scale)
+                        empty = bpy.data.objects.new( f"{path.basename(filepath)[:-4]}_{f}" , None )
+                        bpy.context.scene.collection.objects.link(empty)
+                        for mesh in mesh_objects:
+                            mesh.parent = empty
                 case _: continue
                 # todo: animations redo
                 # pzz's file pattern allow me to know what armature belongs to what model because they're always next to each other 
