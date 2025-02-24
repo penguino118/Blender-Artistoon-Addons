@@ -16,8 +16,8 @@ class AMOMaterialPanel(bpy.types.Panel):
         layout = self.layout
         layout_box = layout.box()
         row = layout_box.row()
-        row.prop(context.mesh, "PZZ_Compressed")
-        row.prop(context.mesh, "PZZ_Index")
+        row.prop(context.object, "PZZ_Index")
+        row.prop(context.object, "PZZ_Compressed")
 
 
 def register():
