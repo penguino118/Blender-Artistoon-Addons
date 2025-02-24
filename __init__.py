@@ -277,6 +277,7 @@ classes = [
 from .blender import AHI_bone_attribute_panel
 from .blender import AMO_mesh_attribute_panel
 from .blender import AMO_material_panel
+from .blender import PZZ_entry_panel
 
 def register():
     for art_class in classes:
@@ -285,6 +286,7 @@ def register():
     AHI_bone_attribute_panel.register()
     AMO_mesh_attribute_panel.register()
     AMO_material_panel.register()
+    PZZ_entry_panel.register()
     bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
 
@@ -293,9 +295,9 @@ def unregister():
     for art_class in classes:
         bpy.utils.unregister_class(art_class)
     bpy.utils.unregister_class(Import_PZZ)
-    AHI_bone_attribute_panel.unregister()
     AMO_mesh_attribute_panel.unregister()
     AMO_material_panel.unregister()
+    PZZ_entry_panel.unregister()
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
 
