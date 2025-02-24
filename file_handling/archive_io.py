@@ -1,5 +1,7 @@
 # pzz-unpack, decompression and compression originally written by infval
 # https://github.com/infval/pzzcompressor_jojo/blob/master/pzz_comp_jojo.py
+import bpy
+from os import path
 from .artistoon_import import AMO_importer
 from .artistoon_import import AHI_importer
 from .binary_rw import int16_read, int32_read
@@ -24,36 +26,53 @@ def load_from_pzz(context, filepath, use_z_up, user_scale):
 
             file_list.append({
                 "buffer" : file_buffer,
-                "type"   : get_filetype(file_buffer)
+                "type"   : get_filetype(file_buffer),
+                "compressed" : is_compressed
             })
             
             file_offset += file_size
             read_offset += 0x4
         
         # import
+        collection_name = f"{path.basename(filepath)[:-4]} File Entries"
+        pzz_collection = bpy.data.collections.new(collection_name)
+        bpy.context.scene.collection.children.link(pzz_collection)
+
         for f in range(len(file_list)):
             file = file_list[f]
             match(file["type"]):
                 case "AMO": 
                     # if we find a model, we'll import it
                     mesh_objects = AMO_importer.amo_read(file["buffer"], filepath, use_z_up, user_scale)
+                    for mesh in mesh_objects:
+                        # unlink from main collection so we can link it to the pzz collection
+                        bpy.context.scene.collection.objects.unlink(mesh)
+                        pzz_collection.objects.link(mesh)
                     # then we go through and import the armature with the objects imported from the model
                     # the armature is always the file next to the model
                     if f+1 <= len(file_list):  # but just in case, we check
                         ahi_file = file_list[f+1] 
                         if ahi_file["type"] == "AHI": 
-                            AHI_importer.ahi_read(ahi_file["buffer"], filepath, mesh_objects, use_z_up, user_scale)
+                            armature = AHI_importer.ahi_read(ahi_file["buffer"], filepath, mesh_objects, use_z_up, user_scale)
+                            # both entry flags are from the AMO, rather than the armature, which will make exporting easier
+                            armature.PZZ_Index = f
+                            armature.PZZ_Compressed = file["compressed"]
+                            # unlink armature from main scene and link to pzz collection instead
+                            bpy.context.scene.collection.objects.unlink(armature)
+                            pzz_collection.objects.link(armature)
                     
                     else:
                         # if there's no armature let's parent to an empty object instead
                         print(f"No armature found, parenting to empty")
-                        import bpy
-                        from os import path
                         mesh_objects = AMO_importer.amo_read(file["buffer"], filepath, use_z_up, user_scale)
                         empty = bpy.data.objects.new( f"{path.basename(filepath)[:-4]}_{f}" , None )
-                        bpy.context.scene.collection.objects.link(empty)
+                        empty.PZZ_Index = f
+                        empty.PZZ_Compressed = file["compressed"]
+                        pzz_collection.objects.link(empty)
                         for mesh in mesh_objects:
                             mesh.parent = empty
+                            bpy.context.scene.collection.objects.unlink(mesh)
+                            pzz_collection.objects.link(mesh)
                 case _: continue
                 # todo: animations redo
                 # pzz's file pattern allow me to know what armature belongs to what model because they're always next to each other 

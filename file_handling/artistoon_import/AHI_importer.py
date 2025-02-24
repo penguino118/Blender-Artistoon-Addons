@@ -167,8 +167,8 @@ def build_armature(filename, bone_data_list, root_bone_list, mesh_objects):
         except:
             print(f"Error parenting mesh to bone {bone_data_list.index(bone_data)}")
     
+    return created_armature
     
-
 
 def ahi_read(filebuffer, filepath, mesh_objects, use_z_up, user_scale):
     filename = os.path.basename(filepath)
@@ -197,7 +197,7 @@ def ahi_read(filebuffer, filepath, mesh_objects, use_z_up, user_scale):
 
         read_offset += current_sector["data_size"]
 
-    build_armature(filename, bone_data_list, root_bone_list, mesh_objects)
+    return build_armature(filename, bone_data_list, root_bone_list, mesh_objects)
 
 
 def read(context, filepath, user_scale, use_z_up):
