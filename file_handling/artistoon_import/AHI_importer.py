@@ -104,6 +104,8 @@ def build_armature(filename, bone_data_list, root_bone_list, mesh_objects):
     
     for mesh in mesh_objects:
         mesh.parent = created_armature
+        mesh.modifiers.new(name= 'Armature', type = 'ARMATURE')
+        mesh.modifiers['Armature'].object = created_armature
 
     target_armature.display_type = 'STICK'
     target_armature.show_names = True
