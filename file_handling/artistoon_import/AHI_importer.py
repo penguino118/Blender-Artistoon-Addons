@@ -9,13 +9,8 @@ from ..binary_rw import int16_read, int32_read, int32_read_signed, float_read
 
 z_up_rotation = mathutils.Euler((math.radians(90.0), 0.0, math.radians(180.0)), 'XYZ')
 
-
-
-
-
-
-
-
+# to properly sort children names
+# https://stackoverflow.com/questions/58861558/natural-sorting-of-a-list-in-python3
 
 import re
 
@@ -30,14 +25,7 @@ def natural_keys(text):
     '''
     return [ atoi(c) for c in re.split(r'(\d+)', text) ]
 
-
-
-
-
-
-
-
-
+##################################################################################
 
 def get_tree_root_bones(buffer, offset, bone_count, list):
     for x in range(bone_count):
