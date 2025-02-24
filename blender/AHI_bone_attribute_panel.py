@@ -36,7 +36,7 @@ def register():
 
 def unregister():
     bpy.utils.unregister_class(AHIBonePanel)
-    del bpy.types.Mesh.AHI_MeshPointer
+    del bpy.types.EditBone.AHI_MeshPointer
 
 
 if __name__ == "__main__":
