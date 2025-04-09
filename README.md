@@ -1,39 +1,14 @@
 # Blender Artistoon Addons
-Blender addon that helps handle assets from the Artistoon engine. Designed to be used with [**GioGio's Bizarre Adventure (PS2)**](https://jojowiki.com/GioGio%27s_Bizarre_Adventure) files.</br>
-Auto Modellista meshes should work well, too.
+Blender addon that helps handle assets from the Artistoon engine. Designed to be used with [**GioGio's Bizarre Adventure (PS2)**](https://jojowiki.com/GioGio%27s_Bizarre_Adventure) files.
 
-# Importers
-## Model Importer (AMO)
-### To-do
-- [ ]  Figure out usage of unknown mesh attribute flags
+## Usage
+Enable the addon under Blender's settings and then import any `.pzz` file located within `AFS_DATA.AFS`. The addon will create a new collection containing imported files within the `.pzz`, if found.
 
-## Armature Importer (AHI)
-### To-do
-- [ ]  Figure out usage of unknown attribute flags
-- [ ]  Reposition model meshes (if already imported) based on bones with translation flag
+When exporting, make sure that the collection holding the imported `.pzz` files is selected in the Outliner, and then export over the original `.pzz` archive, or a copy of it. The addon does not create new .pzz files and instead writes the new data over existing entries, so that any data not imported from the original is preserved.
 
-## Animation Importer (AAN)
-### To-do
-- [ ]  Support Camera animations
-- [ ]  Add animation data types to empty collection for export usage
-- [ ]  Read initial header correctly, varies per file a lot
-- [ ]  Support Scale and Position key-frame sectors
-- [ ]  Fix incorrect rotation from **SHORT** type animation data
-- [ ]  Set frame range and loop start values when creating animation actions
-- [ ]  Set FCurve 'Ease In' and 'Ease Out' to the animation values instead of Blender’s auto calculation
-
-</br>
-
-# Exporters
-## Model Exporter (AMO)
-### To-do
-- [x]  Fix mesh normals operations for newer blender versions
-- [x]  Auto split face corners with multiple UVs
-- [x]  Find better solution for Triangle Strips
-
-## Armature Exporter (AHI)
-### To-do
-- [ ]  Rotation is not always the same as source post export
-    - Rotation is ocasionally missing for some bones on export, not sure why.
-    - st0e0 (Chapter 10-1) is the main example, clouds don’t keep the same rotation on import/export
-- [ ]  Support weird behavior from st0b0 (Pillar object bones)
+## To-do
+- [ ]  Auto Modellista .bin I/O support
+- [ ]  GioGio PS2 SDT data support (Shadow caster volumes, for characters)
+- [ ]  GioGio PS2 HITS data support (Stage Collision meshes)
+- [ ]  GioGio PS2 AAN support (Animation data)
+- [ ]  GioGio PS2 TXB/TIM2 import...?
