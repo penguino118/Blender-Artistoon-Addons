@@ -83,12 +83,6 @@ class Export_PZZ(Operator, ImportHelper):
         default='LOOP_NORMALS',
     )
     
-    normal_split: BoolProperty(
-        name="Split Faces by Normals",
-        description="Automatically splits face corners that make vertices have multiple UVs to safely store them per vertex",
-        default=True,
-    )
-    
     uv_split: BoolProperty(
         name="Split Faces by UVs",
         description="Automatically splits face corners that make vertices have multiple UVs to safely store them per vertex",
