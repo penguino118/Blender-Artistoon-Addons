@@ -36,7 +36,7 @@ def get_all_materials(mesh_objects):
                 if texture_property not in texture_list:
                     texture_list.append(get_texture_properties(material))
                 # setting the material's texture index to be the index of the texture in the texture list
-                material.AMO_TextureIndex = texture_list.index(texture_property)
+                material["ExportTextureIndex"] = texture_list.index(texture_property)
                 material_list.append(material)
     material_list = sorted(material_list, key=get_material_name)
     
@@ -58,7 +58,7 @@ def get_all_materials(mesh_objects):
         material_list_sector_bytes.extend(float_write(material.AMO_Unknown4))
         material_list_sector_bytes.extend(int32_write(material.AMO_Unknown5))
         pad_with_byte(material_list_sector_bytes, 0x00, 0xC8)
-        material_list_sector_bytes.extend(int32_write(material.AMO_TextureIndex))
+        material_list_sector_bytes.extend(int32_write(material["ExportTextureIndex"]))
     
     # sector header
     insert_header(material_list_sector_bytes, 0x00000009, len(material_list))
