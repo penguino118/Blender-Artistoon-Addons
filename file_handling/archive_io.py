@@ -1,25 +1,45 @@
 # pzz-unpack, decompression and compression originally written by infval
 # https://github.com/infval/pzzcompressor_jojo/blob/master/pzz_comp_jojo.py
+
+# todo: unpack_bin for auto modellista
+# https://gist.github.com/penguino118/e8e2095fdd1a9ddf37f37625c414b255
+
 import bpy
 from os import path
-from .artistoon_import import AMO_importer
-from .artistoon_import import AHI_importer
-from .binary_rw import int16_read, int32_read
+from pathlib import Path
+from .artistoon_import import AMO_importer, AHI_importer
+from .artistoon_export import AMO_exporter, AHI_exporter
+from .util import natural_keys
+from .binary_rw import int16_read, int32_read, int32_write, int16_write, int08_write, pad_with_byte
 
-def load_from_pzz(context, filepath, use_z_up, user_scale):
+
+def pad_to_sector_size(input_bytes):  # edits list and returns entry size val
+    bytes_length = len(input_bytes)
+    if bytes_length <= 0:
+        return input_bytes
+    
+    sector_size = 0
+    while (sector_size * 0x800) < bytes_length:
+        sector_size += 1
+    padding_size = (sector_size * 0x800) - bytes_length
+    
+    pad_with_byte(input_bytes, 0x0, padding_size)
+    return sector_size
+
+
+def load_from_pzz(self, filepath, use_z_up, user_scale):
+    import_count = 0
     with open(filepath, "rb") as f:
 
-        buffer = f.read()
+        buffer = bytearray(f.read())
         file_count = int32_read(buffer, 0x0)
         file_list = []
         read_offset = 0x4
         file_offset = 0x800
-        print(f"FILECOUNT={file_count}")
         # gather all model/skeleton/animation files inside
-        for file_index in range(file_count):
+        for i in range(file_count):
             file_size = int16_read(buffer, read_offset) * 0x800
             is_compressed = int16_read(buffer, read_offset+0x2) == 0x8000
-            print(f"//////////////////////////////  file {file_index}: is_compressed={is_compressed} ({int16_read(buffer, read_offset)})")
             if file_size < 1: continue
             file_buffer = buffer[file_offset:file_offset+file_size]
             if is_compressed: file_buffer = get_decompressed(file_buffer)
@@ -34,49 +54,135 @@ def load_from_pzz(context, filepath, use_z_up, user_scale):
             read_offset += 0x4
         
         # import
-        collection_name = f"{path.basename(filepath)[:-4]} File Entries"
-        pzz_collection = bpy.data.collections.new(collection_name)
-        bpy.context.scene.collection.children.link(pzz_collection)
+        if len(file_list) > 0:
+            collection_name = f"{path.basename(filepath)[:-4]} File Entries"
+            pzz_collection = bpy.data.collections.new(collection_name)
+            bpy.context.scene.collection.children.link(pzz_collection)
 
-        for f in range(len(file_list)):
-            file = file_list[f]
-            match(file["type"]):
-                case "AMO": 
-                    # if we find a model, we'll import it
-                    mesh_objects = AMO_importer.amo_read(file["buffer"], filepath, use_z_up, user_scale)
-                    for mesh in mesh_objects:
-                        # unlink from main collection so we can link it to the pzz collection
-                        bpy.context.scene.collection.objects.unlink(mesh)
-                        pzz_collection.objects.link(mesh)
-                    # then we go through and import the armature with the objects imported from the model
-                    # the armature is always the file next to the model
-                    if f+1 <= len(file_list):  # but just in case, we check
-                        ahi_file = file_list[f+1] 
-                        if ahi_file["type"] == "AHI": 
-                            armature = AHI_importer.ahi_read(ahi_file["buffer"], filepath, mesh_objects, use_z_up, user_scale)
-                            # both entry flags are from the AMO, rather than the armature, which will make exporting easier
-                            armature.PZZ_Index = f
-                            armature.PZZ_Compressed = file["compressed"]
-                            # unlink armature from main scene and link to pzz collection instead
-                            bpy.context.scene.collection.objects.unlink(armature)
-                            pzz_collection.objects.link(armature)
-                    
-                    else:
-                        # if there's no armature let's parent to an empty object instead
-                        print(f"No armature found, parenting to empty")
-                        mesh_objects = AMO_importer.amo_read(file["buffer"], filepath, use_z_up, user_scale)
-                        empty = bpy.data.objects.new( f"{path.basename(filepath)[:-4]}_{f}" , None )
-                        empty.PZZ_Index = f
-                        empty.PZZ_Compressed = file["compressed"]
-                        pzz_collection.objects.link(empty)
+            for f, file in enumerate(file_list):
+                match(file["type"]):
+                    case "AMO": 
+                        # if we find a model, we'll import it
+                        mesh_objects = AMO_importer.amo_read(file["buffer"], f, Path(filepath).stem, use_z_up, user_scale)
                         for mesh in mesh_objects:
-                            mesh.parent = empty
+                            # unlink from main collection so we can link it to the pzz collection
                             bpy.context.scene.collection.objects.unlink(mesh)
                             pzz_collection.objects.link(mesh)
-                case _: continue
-                # todo: animations redo
-                # pzz's file pattern allow me to know what armature belongs to what model because they're always next to each other 
-                # animations don't though...... they're all shoved at the end with no reference to which skeleton they belong to
+                            # even though we're setting the pzz entry information per object,
+                            # all AMO objects will be exported as one file, so only the top mesh's
+                            # info will be used on export
+                            mesh.PZZ_Index = f
+                            mesh.PZZ_Compressed = file["compressed"]
+                        import_count += 1
+                        
+                        # then we go through and import the armature with the objects imported from the model
+                        # the armature is always the file next to the model
+                        if len(file_list) >= (f+1):  # but just in case, we check
+                            next_file = file_list[f+1] 
+                            if next_file["type"] == "AHI": 
+                                armature = AHI_importer.ahi_read(next_file["buffer"], f+1, Path(filepath).stem, mesh_objects, use_z_up, user_scale)
+                                armature.PZZ_Index = f+1
+                                armature.PZZ_Compressed = next_file["compressed"]
+                                # unlink armature from main scene and link to pzz collection instead
+                                bpy.context.scene.collection.objects.unlink(armature)
+                                pzz_collection.objects.link(armature)
+                                import_count += 1
+                        else:
+                            # if there's no armature let's parent to an empty object instead
+                            print(f"No armature found, parenting to empty")
+                            mesh_objects = AMO_importer.amo_read(file["buffer"], f, Path(filepath).stem, use_z_up, user_scale)
+                            empty = bpy.data.objects.new( f"{Path(filepath).stem}_{f:03}" , None )
+                            empty.PZZ_Index = f
+                            empty.PZZ_Compressed = file["compressed"]
+                            empty.Model_Type = 'AMO'
+                            pzz_collection.objects.link(empty)
+                            for mesh in mesh_objects:
+                                mesh.parent = empty
+                                bpy.context.scene.collection.objects.unlink(mesh)
+                                pzz_collection.objects.link(mesh)
+                    case _: continue
+                    # todo: animations redo, shadow volumes, stage collision
+                    # pzz's file pattern allow me to know what armature belongs to what model because they're always next to each other 
+                    # animations don't though...... they're all shoved at the end with no reference to which skeleton they belong to
+    self.report({'INFO'}, f"Imported {import_count} files from the PZZ archive.")
+    return {'FINISHED'}
+
+
+def export_to_pzz(self, filepath, user_scale, face_type, normal_type, uv_split, use_z_up):
+    if not path.isfile(filepath):
+        self.report({'ERROR'}, f"Cannot save collection objects into a PZZ that doesn't already exist.")
+        return {'CANCELLED'}
+    
+    # get entries from collection objects
+    collection = bpy.context.view_layer.active_layer_collection.collection
+    print(f"Exporting collection: {collection.name}")
+    file_replacements = []
+    for object in collection.objects:
+        amo_mesh_objects = []
+        hits_mesh_objects = [] # todo: this
+        sdt_mesh_objects = [] # todo: implement shadow volume i/o
+
+        if object.type != 'ARMATURE' and object.type != 'EMPTY':
+            continue #raise Exception(f"Exported collection has a root object that isn't an armature or empty! ({object.name})")
+
+        for child in object.children:
+            if child.type == 'MESH':
+                match(child.data.Export_Type):
+                    case 'AMO': amo_mesh_objects.append(child)
+                    case 'HITS': hits_mesh_objects.append(child)
+                    case 'SDT': sdt_mesh_objects.append(child)
+        
+        amo_mesh_objects = sorted(amo_mesh_objects[:], key=lambda obj: natural_keys(obj.name))
+
+        # get model data
+        armature_bytes, armature_entry, bone_list = AHI_exporter.get_ahi(object, use_z_up, user_scale, amo_mesh_objects) # should return empty if the object isn't an armature
+        model_bytes, model_entry = AMO_exporter.get_amo(amo_mesh_objects, bone_list, uv_split, face_type, normal_type, user_scale, use_z_up)
+        
+        for export, entry_info in zip(
+            [model_bytes, armature_bytes], 
+            [model_entry, armature_entry]):
+            if len(export) > 0:
+                file_replacements.append({
+                    "index" : entry_info["index"],
+                    "compressed" : entry_info["compressed"],
+                    "bytes" : export
+                })
+    
+    buffer = bytearray()
+    with open(filepath, "rb") as f:
+        buffer = bytearray(f.read())
+
+        header_offset = 0x4
+        for replacement in file_replacements:
+            file_index = replacement["index"]
+            is_compressed = replacement["compressed"]
+            new_file_data = replacement["bytes"]
+            
+            if is_compressed:
+                new_file_data = get_compressed(new_file_data)
+            sector_size = pad_to_sector_size(new_file_data)
+            
+            # get offset of file to replace
+            current_offset = 0x800  # skip header
+            for i in range(file_index):
+                sector_count = int16_read(buffer, header_offset + (i * 0x4))
+                current_offset += sector_count * 0x800
+            
+            original_sector_count = int16_read(buffer, header_offset + (file_index * 0x4))
+            original_file_size = original_sector_count * 0x800
+            print(f"Replacing file {file_index} at {hex(current_offset)}:{hex(current_offset + original_file_size)}")
+            buffer[current_offset:current_offset + original_file_size] = new_file_data
+            
+            # update header entry
+            entry_offset = header_offset + (file_index * 0x4)
+            buffer[entry_offset:entry_offset+2] = int16_write(sector_size)
+            compression_flag = 0x8000 if is_compressed else 0
+            buffer[entry_offset+2:entry_offset+4] = int16_write(compression_flag)
+
+    with open(filepath, "wb") as f:
+        f.write(buffer)
+
+    self.report({'INFO'}, f"Written {len(file_replacements)} to the PZZ archive.")
     return {'FINISHED'}
 
 
@@ -86,14 +192,13 @@ def get_filetype(buffer):
     test_int1 = int32_read(buffer, read_offset)
     test_int2 = int32_read(buffer, read_offset+0x4)
 
-    if test_int1 == 1 and (test_int2 == 4 or test_int2 == 3): return "AMO"
-    elif test_int1 == 0xC0000000: return "AHI"
-    elif test_int2 == 0x40: return "AAN" # todo: doesnt apply to player animations
+    if test_int1 == 1 and (test_int2 > 2 and test_int2 < 6): return "AMO" # model data
+    elif test_int1 == 0xC0000000: return "AHI" # bone data
+    elif test_int2 == 0x40: return "AAN" # animation data -- todo: doesnt apply to player file animations
+    elif test_int2 == 0x50000: return "SDT" # shadow data
+    elif test_int1 == 0x53544948: return "HITS" # stage collision data
     else: return "" # then we do not care
 
-
-# todo: unpack_bin for auto modellista
-# https://gist.github.com/penguino118/e8e2095fdd1a9ddf37f37625c414b255
 
 def get_decompressed(b):
     bout = bytearray()

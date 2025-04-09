@@ -1,15 +1,14 @@
 import bpy
-import os
 import bmesh
 import math
 import mathutils
+from ..util import flip_zy
 from ..sector_handler import get_sector_info, AMO_sector_dict as sector_types
 from ..binary_rw import int16_read, int32_read, float_read
 
-z_up_rotation = mathutils.Euler((math.radians(90.0), 0.0, math.radians(180.0)), 'XYZ')
 
-
-def create_material(material_name, material_property):
+def create_material(filename, index, material_property):
+    material_name = f"{filename}_Material{index}"
     material = bpy.data.materials.new(material_name)
     
     material.AMO_MaterialType  = material_property["AMO_MaterialType"]
@@ -22,6 +21,8 @@ def create_material(material_name, material_property):
     material.AMO_Unknown4      = material_property["AMO_Unknown4"]
     material.AMO_Unknown5      = material_property["AMO_Unknown5"]
     
+    # custom property to later apply the material
+    material["ListIndex"] = index
     return material
 
 
@@ -94,7 +95,7 @@ def build_materials(filename, buffer, offset, material_offset_start):
     all_materials_list = []
     for index in range(len(material_property_list)):
         material_property = material_property_list[index]
-        all_materials_list.append(create_material(f"{filename[:-4]}_mat{index}", material_property))
+        all_materials_list.append(create_material(filename, index, material_property))
     return all_materials_list
 
 
@@ -121,7 +122,7 @@ def get_indices(buffer, offset, strip_count, list, strip_length_list):
 def get_vert_coords(buffer, offset, sector_size, vertex_count, list, scale, use_z_up):
     for x in range(vertex_count):
         vertpos = mathutils.Vector((float_read(buffer, offset)*scale, float_read(buffer, offset+0x4)*scale, float_read(buffer, offset+0x8)*scale))
-        if use_z_up: vertpos.rotate(z_up_rotation)
+        if use_z_up: flip_zy(vertpos)
         list.append(vertpos)
         offset += 0xC
         if offset >= sector_size:
@@ -131,7 +132,7 @@ def get_vert_coords(buffer, offset, sector_size, vertex_count, list, scale, use_
 def get_vert_normals(buffer, offset, sector_size, vertex_count, list, use_z_up):
     for x in range(vertex_count):
         normal = mathutils.Vector((float_read(buffer, offset), float_read(buffer, offset+0x4), float_read(buffer, offset+0x8)))
-        if use_z_up: normal.rotate(z_up_rotation)
+        if use_z_up: flip_zy(normal)
         list.append(normal)
         offset += 0xC
         if offset >= sector_size:
@@ -140,7 +141,7 @@ def get_vert_normals(buffer, offset, sector_size, vertex_count, list, use_z_up):
 
 def get_vert_uvs(buffer, offset, sector_size, vertex_count, list):
     for x in range(vertex_count):
-        uv = float_read(buffer, offset), 1.0-float_read(buffer, offset+0x4)
+        uv = float_read(buffer, offset), 1.0-float_read(buffer, offset+0x4) # UVs are flipped in the Y coordinate
         list.append(uv)
         offset += 0x8
         if offset >= sector_size:
@@ -212,7 +213,7 @@ def get_mesh_bounding_data(buf, offset, scale):
 
 
 def build_mesh(all_materials_list, index, filename, mesh_data, striplength):
-    mesh_name = f"{filename[:-4]}_mesh{index}" 
+    mesh_name = f"{filename}_AMO_Mesh{index}" 
     target_mesh = bpy.data.meshes.new(mesh_name)
     created_mesh = bpy.data.objects.new(mesh_name, target_mesh)
     bpy.context.scene.collection.objects.link(created_mesh)
@@ -220,11 +221,12 @@ def build_mesh(all_materials_list, index, filename, mesh_data, striplength):
     # adding material to object
     for mat_index in mesh_data["materials"]:
         for mat in all_materials_list:
-            testname = mat.name.split("_")[-1][3:]
-            if '.' in testname: #duplicate material
-                testname = testname.split(".")[0]
-            if testname == str(mat_index):
-                target_mesh.materials.append(mat)
+            if "ListIndex" in mat:
+                if mat["ListIndex"] == mat_index:
+                    target_mesh.materials.append(mat)
+            else:
+                raise Exception("Material is lacking index property! How???")
+
     
     # set vertices
     bm = bmesh.new()
@@ -294,6 +296,8 @@ def build_mesh(all_materials_list, index, filename, mesh_data, striplength):
         col_attribute.data[vertex_index].color = mesh_data["colors"][vertex_index]
 
     # set mesh attributes
+    created_mesh.data.Export_Type = 'AMO'
+    
     if len(mesh_data["attributes"]):
         created_mesh.data.AMO_RenderDistance = mesh_data["attributes"]["AMO_RenderDistance"]
         created_mesh.data.AMO_Unknown_0x10   = mesh_data["attributes"]["AMO_Unknown_0x10"]
@@ -321,8 +325,8 @@ def build_mesh(all_materials_list, index, filename, mesh_data, striplength):
     return created_mesh
 
 
-def amo_read(filebuffer, filepath, use_z_up, user_scale):
-    filename = os.path.basename(filepath)
+def amo_read(filebuffer, pzz_index, filepath, use_z_up, user_scale):
+    filename = f"{filepath}_{pzz_index:03}" if pzz_index != -1 else filepath
     read_offset = 0x0
     created_objects = []
     
@@ -341,6 +345,8 @@ def amo_read(filebuffer, filepath, use_z_up, user_scale):
     
     if model_container["header"] == sector_types["ModelHeader"]:
         all_materials_list = build_materials(filename, filebuffer, read_offset, model_container["data_size"])
+
+        print(all_materials_list)
         read_offset += 0xC # skip over the model container header
         for model_index in range(model_container["data_count"]):
             

@@ -10,33 +10,26 @@ class AHIBonePanel(bpy.types.Panel):
     
     @classmethod
     def poll(cls, context):
-        bone = context.edit_bone
-        return bone and bone.select == True
+        bone = context.bone
+        if bone == None: return False
+        else: return bone and bone.select or bone.select_head or bone.select_tail
     
     def draw(self, context):
         layout = self.layout
-        layout_box = layout.box()
-        row = layout_box.row(align=True, heading="Attached Mesh")
-        row.prop(context.edit_bone, "AHI_MeshPointer")
+        row = layout.column()
+        row.label(text="Shadow Volume Size")
+        row = layout.row()
+        row.prop(context.bone, "AHI_ShadowVolumeSize", text='')
         
-
-
-def poll_meshes(self, object):
-    return object.type == 'MESH' and object.parent.type == 'ARMATURE'
-
 
 def register():
     bpy.utils.register_class(AHIBonePanel)
-    
-    bpy.types.EditBone.AHI_MeshPointer = bpy.props.PointerProperty(
-        name="",
-        type=bpy.types.Object,
-        poll=poll_meshes)
+    bpy.types.Bone.AHI_ShadowVolumeSize = bpy.props.FloatVectorProperty(name = "Shadow Volume Size", subtype = "XYZ_LENGTH", size = 4, default = (1.0,1.0,1.0,1.0))
 
 
 def unregister():
     bpy.utils.unregister_class(AHIBonePanel)
-    del bpy.types.EditBone.AHI_MeshPointer
+    del bpy.types.Bone.AHI_ShadowVolumeSize
 
 
 if __name__ == "__main__":

@@ -11,13 +11,13 @@ def get_sector_info(buffer, offset):
         "data_size" : size
     }
 
-def get_sector_size(array):
-    tmpb = 0x4
-    for fun in array:
-        ppp = fun.hex()
-        tmpb += int(len(ppp)/2)
-    tmpb = int32_write(tmpb)
-    return tmpb
+
+def insert_header(byte_array, sector_key, data_count):
+    sector_size = len(byte_array) + 0xC
+    byte_array[0:0] = int32_write(sector_key)
+    byte_array[4:4] = int32_write(data_count)
+    byte_array[8:8] = int32_write(sector_size)
+
 
 # Animation
 AAN_sector_dict = {

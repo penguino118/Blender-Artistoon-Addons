@@ -16,17 +16,11 @@ def int32_write_signed(int):
     
 def float_write(float):
     return struct.pack('<f', float)
-    
-def int32_write_list(list):
-    tmpb = []
-    for x in list:
-        tmpb.append(struct.pack('<I', x))
-    return tmpb
 
-def pad_bytes(input_list, input_byte, size):
-    l = [input_byte] * (size//4)
+def pad_with_byte(input_list, input_byte, size):
+    l = [input_byte] * (size)
     for v in l:
-        input_list.append(int32_write(v))
+        input_list.extend(int08_write(v))
         
 
 # READ #

@@ -10,7 +10,7 @@ class AMOMaterialPanel(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         object = context.object
-        return object and object.type == 'ARMATURE' or object.type == 'EMPTY' 
+        return object and object.type == 'ARMATURE' or object.type == 'EMPTY' or object.type == 'MESH'
     
     def draw(self, context):
         layout = self.layout
@@ -22,14 +22,14 @@ class AMOMaterialPanel(bpy.types.Panel):
 
 def register():
     bpy.utils.register_class(AMOMaterialPanel)
-    bpy.types.Object.PZZ_Compressed = bpy.props.BoolProperty(name='Compressed')
     bpy.types.Object.PZZ_Index      = bpy.props.IntProperty(name = "PZZ Index", min=0x0, max=512, default=0)
+    bpy.types.Object.PZZ_Compressed = bpy.props.BoolProperty(name='Export Compressed')
 
 
 def unregister():
     bpy.utils.unregister_class(AMOMaterialPanel)
-    del bpy.types.Object.PZZ_Compressed
     del bpy.types.Object.PZZ_Index
+    del bpy.types.Object.PZZ_Compressed
 
 
 if __name__ == "__main__":

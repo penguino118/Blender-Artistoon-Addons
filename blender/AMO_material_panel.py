@@ -1,7 +1,7 @@
 import bpy
 
 class AMOMaterialPanel(bpy.types.Panel):
-    bl_label = "Artistoon Material"
+    bl_label = "Artistoon Material Settings"
     bl_idname = "ARTISTOON_PT_Material"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -34,6 +34,7 @@ class AMOMaterialPanel(bpy.types.Panel):
             pass
         
 def register():
+    bpy.utils.register_class(AMOMaterialPanel)
     bpy.types.Material.AMO_MaterialType  = bpy.props.IntProperty(name = "Material Type", min=0x0, max=0xFFFFFFF, default=0x00)
     bpy.types.Material.AMO_TextureIndex  = bpy.props.IntProperty(name = "Texture Index", min=0x0, max=0xFFFFFFF, default=0x00)
     bpy.types.Material.AMO_TextureWidth  = bpy.props.IntProperty(name = "Width", min=0x0, max=1024, step=16, default=16)
@@ -43,8 +44,6 @@ def register():
     bpy.types.Material.AMO_ColorUnk3     = bpy.props.FloatVectorProperty(name = "Unknown 3", subtype = "COLOR", size = 4, min = 0.0, max = 1.0, default = (1.0, 1.0, 1.0, 1.0))
     bpy.types.Material.AMO_Unknown4      = bpy.props.FloatProperty(name = "Unknown 4", default = 50.0)
     bpy.types.Material.AMO_Unknown5      = bpy.props.IntProperty(name = "Unknown 5", min=0x0, max=0xFFFFFFF, default=0x01)
-
-    bpy.utils.register_class(AMOMaterialPanel)
 
 
 def unregister():

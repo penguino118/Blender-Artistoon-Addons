@@ -14,40 +14,57 @@ class AMOMaterialPanel(bpy.types.Panel):
     
     def draw(self, context):
         layout = self.layout
-        layout_box = layout.box()
         
-        row = layout_box.row()
-        row.prop(context.mesh, "AMO_HasBounding")
-        row = layout_box.row()
-        if context.object.data.AMO_HasBounding:
-            row.prop(context.mesh, "AMO_Bounding")
-        else:
+        row = layout.column()
+        row.label(text="Export Type")
+        row.prop(context.mesh, "Export_Type", expand=True)
+
+        if context.object.data.Export_Type == 'AMO':
+            layout_box = layout.box()
             row = layout_box.row()
-            row.prop(context.mesh, "AMO_RenderDistance")
+            row.prop(context.mesh, "AMO_HasBounding")
             row = layout_box.row()
-            row.prop(context.mesh, "AMO_Culling")
+            if context.object.data.AMO_HasBounding:
+                row = layout.column()
+                row.label(text="Bounding Box Size")
+                row = layout.row()
+                row.prop(context.mesh, "AMO_Bounding", text='')
+            else:
+                row = layout_box.row()
+                row.prop(context.mesh, "AMO_RenderDistance")
+                row = layout_box.row()
+                row.prop(context.mesh, "AMO_Culling")
+                row = layout_box.row()
+                row.prop(context.mesh, "AMO_Scissor")
+                row.prop(context.mesh, "AMO_Light")
+                row = layout_box.row()
+                row.prop(context.mesh, "AMO_UVScroll")
+                row.prop(context.mesh, "AMO_FadeColor")
+                row = layout_box.row()
+                row.prop(context.mesh, "AMO_Special")
+                row.prop(context.mesh, "AMO_Unknown_0x10")
+                row = layout_box.row()
+                row.prop(context.mesh, "AMO_Unknown_0x14")
+                row.prop(context.mesh, "AMO_Unknown_0x24")
+                row.prop(context.mesh, "AMO_Unknown_0x2C")
+                row.prop(context.mesh, "AMO_Unknown_0x38")
+                row.prop(context.mesh, "AMO_Unknown_0x3C")
+                row = layout_box.row()
+                row.prop(context.mesh, "AMO_Unknown_0x40")
+                row.prop(context.mesh, "AMO_Unknown_0x44")
+                row.prop(context.mesh, "AMO_Unknown_0x48")
+                row.prop(context.mesh, "AMO_Unknown_0x4C")
+                row.prop(context.mesh, "AMO_Unknown_0x50")
+        elif context.object.data.Export_Type == 'HITS':
+            layout_box = layout.box()
             row = layout_box.row()
-            row.prop(context.mesh, "AMO_Scissor")
-            row.prop(context.mesh, "AMO_Light")
+            row.prop(context.mesh, "HITS_GridSize")
             row = layout_box.row()
-            row.prop(context.mesh, "AMO_UVScroll")
-            row.prop(context.mesh, "AMO_FadeColor")
+            row.prop(context.mesh, "HITS_CellSize")
             row = layout_box.row()
-            row.prop(context.mesh, "AMO_Special")
-            row.prop(context.mesh, "AMO_Unknown_0x10")
-            row = layout_box.row()
-            row.prop(context.mesh, "AMO_Unknown_0x14")
-            row.prop(context.mesh, "AMO_Unknown_0x24")
-            row.prop(context.mesh, "AMO_Unknown_0x2C")
-            row.prop(context.mesh, "AMO_Unknown_0x38")
-            row.prop(context.mesh, "AMO_Unknown_0x3C")
-            row = layout_box.row()
-            row.prop(context.mesh, "AMO_Unknown_0x40")
-            row.prop(context.mesh, "AMO_Unknown_0x44")
-            row.prop(context.mesh, "AMO_Unknown_0x48")
-            row.prop(context.mesh, "AMO_Unknown_0x4C")
-            row.prop(context.mesh, "AMO_Unknown_0x50")
-        
+            row.prop(context.mesh, "HITS_OriginOffset")
+
+
 def register():
     bpy.utils.register_class(AMOMaterialPanel)
 
@@ -70,7 +87,18 @@ def register():
     0x48,
     0x4C,
     0x50'''
+    bpy.types.Mesh.Export_Type    = bpy.props.EnumProperty(items=[
+                ("AMO", 'Artistoon Model', 'The children objects will be exported as Artistoon Model data'),
+               ("SDT", 'Shadow Volume', 'The children objects will be exported as stencil shadow volumes'), 
+               ("HITS", 'Stage Collision', 'The children objects will be exported as triangle collision data for stages')],
+               name = "Model Type",
+               default='AMO')
     
+    # HITS -- stage collision
+    bpy.types.Mesh.HITS_GridSize = bpy.props.FloatVectorProperty(name = "Grid Size", subtype = "XYZ_LENGTH", size = 2, default = (0.0,0.0))
+    bpy.types.Mesh.HITS_CellSize = bpy.props.FloatVectorProperty(name = "Cell Size", subtype = "XYZ_LENGTH", size = 2, default = (0.0,0.0))
+    bpy.types.Mesh.HITS_OriginOffset = bpy.props.FloatVectorProperty(name = "Origin Offset", subtype = "XYZ_LENGTH", size = 2, default = (0.0,0.0))
+    # AMO -- artistoon model
     bpy.types.Mesh.AMO_RenderDistance = bpy.props.IntProperty( name = "Maximum Render Distance", min=0x0, max=0x7FFFFFFF, default=65536)
     bpy.types.Mesh.AMO_Unknown_0x10   = bpy.props.IntProperty(name = "Unknown", min=0x0, max=0x7FFFFFFF, default=0x01) # aa_material? in struct 
     bpy.types.Mesh.AMO_Unknown_0x14   = bpy.props.IntProperty(name = "Unknown", min=0x0, max=0x7FFFFFFF, default=0x00)
@@ -95,6 +123,10 @@ def register():
 
 def unregister():
     bpy.utils.unregister_class(AMOMaterialPanel)
+    del bpy.types.Mesh.Export_Type
+    del bpy.types.Mesh.HITS_GridSize
+    del bpy.types.Mesh.HITS_CellSize
+    del bpy.types.Mesh.HITS_OriginOffset
     del bpy.types.Mesh.AMO_RenderDistance
     del bpy.types.Mesh.AMO_Unknown_0x10
     del bpy.types.Mesh.AMO_Unknown_0x14
